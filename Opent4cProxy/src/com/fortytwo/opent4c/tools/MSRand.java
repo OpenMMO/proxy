@@ -1,7 +1,7 @@
 package com.fortytwo.opent4c.tools;
 
 public class MSRand {
-	   private long next;
+	   private int next;
 
 	/**
 	 *  Thanks to Markin for that
@@ -18,7 +18,7 @@ public class MSRand {
 	 *	}
 	 */
 	
-	public MSRand(long seed){
+	public MSRand(int seed){
 		next = seed;
 	}
 	

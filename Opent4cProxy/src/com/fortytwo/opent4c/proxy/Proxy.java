@@ -10,8 +10,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.fortytwo.opent4c.tools.MSRand;
-
 
 public class Proxy {
 	public static long startTime;
@@ -35,7 +33,7 @@ public class Proxy {
 		while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
 		}
-		serverAddress = InetAddress.getByName("192.168.1.9");
+		serverAddress = InetAddress.getByName("192.168.1.6");
 		parseArgs(args);
 		createSockets();
 		startSendPiles();

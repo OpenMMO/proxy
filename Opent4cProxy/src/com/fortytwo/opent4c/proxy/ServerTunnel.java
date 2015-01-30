@@ -67,6 +67,8 @@ public class ServerTunnel {
 			ClientTunnel.pile(sendPacket);
 			if (Proxy.serverVersion == 150){
 				Pak150 decrypted = new Pak150(receivePacket, true, stamp, micros);
+			}else if (Proxy.serverVersion == 125){
+				Pak125 decrypted = new Pak125(receivePacket, true, stamp, micros);
 			}
 		}
 	}
