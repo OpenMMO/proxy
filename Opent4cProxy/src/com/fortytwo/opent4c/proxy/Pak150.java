@@ -170,38 +170,21 @@ public class Pak150 {
 		System.out.println("[TEST PAK 150 ]");
 		Pak150 test = new Pak150();
 		ByteBuffer seedbuf = ByteBuffer.allocate(4);
-		byte[] s = new byte[4];
-		s[3] = (byte) 0x5D;
-		s[2] = (byte) 0x84;
-		s[1] = (byte) 0xFB;
-		s[0] = (byte) 0x00;
+		//byte[] s = new byte[]{0x00, (byte) 0xFB, (byte) 0x84, 0x5D};
+		byte[] s = new byte[]{0x00, (byte) 0xEA, (byte) 0x98, 0x00};
 		seedbuf.order(ByteOrder.LITTLE_ENDIAN);
 		seedbuf.put(s);
 		seedbuf.rewind();
 		test.seed = seedbuf.getInt();
 		System.out.println("SEED : "+ByteArrayToHexString.print(seedbuf.array()));
-		test.pak = ByteBuffer.allocate(15);
-		test.pak.put((byte) 0x54);
-		test.pak.put((byte) 0x04);
-		test.pak.put((byte) 0x2F);
-		test.pak.put((byte) 0xDE);
-		test.pak.put((byte) 0x9D);
-		test.pak.put((byte) 0xF3);
-		test.pak.put((byte) 0xD5);
-		test.pak.put((byte) 0xA8);
-		test.pak.put((byte) 0x3C);
-		test.pak.put((byte) 0x2C);
-		test.pak.put((byte) 0x58);
-		test.pak.put((byte) 0x2F);
-		test.pak.put((byte) 0x3F);
-		test.pak.put((byte) 0x35);
-		test.pak.put((byte) 0x71);
+		test.pak = ByteBuffer.allocate(103);
+		//test.pak.put(new byte[] {0x54, 0x04, 0x2F, (byte) 0xDE , (byte) 0x9D, (byte) 0xF3, (byte) 0xD5, (byte) 0xA8, 0x3C, 0x2C, 0x58, 0x2F, 0x3F, 0x35, 0x71});
+		test.pak.put(new byte[] {0x0C, (byte) 0xFC, (byte) 0xF9, (byte) 0xEC, (byte) 0xEA, 0x3C, 0x33, (byte) 0x8A, 0x48, 0x79, 0x1E, (byte) 0xD7, 0x49, 0x47, (byte) 0x96, (byte) 0xD4, (byte) 0x89, 0x34, (byte) 0xDF, 0x18, 0x3E, 0x52, (byte) 0xA3, 0x22, 0x6C, (byte) 0xEC, 0x25, 0x2E, (byte) 0xE9, (byte) 0xF2, (byte) 0x92, (byte) 0xED, (byte) 0xD5, (byte) 0xD2, 0x54, (byte) 0xE7, 0x02, (byte) 0xC0, 0x17, (byte) 0xA3, 0x39, 0x2A, (byte) 0x8C, 0x4E, (byte) 0xE9, 0x6A, 0x2A, (byte) 0xDA, (byte) 0xC7, 0x13, 0x0E, 0x43, (byte) 0xC7, (byte) 0xC0, 0x3E, 0x54, (byte) 0x99, 0x1A, 0x7D, (byte) 0xE6, (byte) 0xF2, 0x41, (byte) 0xF2, (byte) 0xBF, 0x4F, 0x20, 0x13, (byte) 0xCD, 0x47, (byte) 0x83, (byte) 0xF2, 0x42, 0x53, (byte) 0xF9, 0x71, (byte) 0xE8, (byte) 0x82, (byte) 0xAB, (byte) 0xB9, 0x16, (byte) 0x85, (byte) 0xA2, 0x54, 0x20, 0x4E, 0x2E, 0x16, 0x3E, 0x19, 0x52, (byte) 0xBD, 0x1B, (byte) 0xED, 0x70, 0x5A, (byte) 0xC4, 0x66, 0x09, (byte) 0xF2, (byte) 0xB1, 0x6E, 0x6D, (byte) 0x94});
 		test.pak.rewind();
 		
 		test.decrypt_150();
 		
 		System.out.println("[TEST TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(test.type>>8 & 0xFF),(byte)(test.type & 0xFF)})+"]");
-		System.out.println("TYPE should be 00 42");
 		System.out.println("TEST PAK DECRYPTED "+ByteArrayToHexString.print(test.pak.array()));
 		byte[] d = new byte[9];
 		test.pak.rewind();
@@ -289,7 +272,7 @@ public class Pak150 {
 		      else if (algo == 16) { pak.array()[index] = (byte) pak_offset										;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index >> 4) | (pak_index << 4)); 			}
 		      else if (algo == 17) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index & 0x0F))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index & 0xF0) | (pak_offset >> 4)); 		}
 		      else if (algo == 18) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index >> 4))			;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset >> 4) | (pak_index << 4)); 			}
-		      else if (algo == 19) { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_offset << 4))		;	pak.array()[crypto.offsets[index]] = (byte)pak_index; 										}
+		      else if (algo == 19) { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_offset << 4))		;	pak.array()[crypto.offsets[index]] = (byte) pak_index; 										}
 		      else if (algo == 20) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset)	; 	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset << 4) | (pak_index >> 4)); 			}
 		}
 		// and finally, quadruple-XOR the data out
