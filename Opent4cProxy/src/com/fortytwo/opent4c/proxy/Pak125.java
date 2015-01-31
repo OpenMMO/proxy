@@ -202,4 +202,20 @@ public class Pak125 {
 	   
 	   return (sum); // return the checksum we found
 	}
+
+	public int getLength() {
+		return length;
+	}
+
+	/**
+	 * Makes a ByteBuffer with proper header and data to be sent
+	 * @return
+	 */
+	public ByteBuffer getSendData() {
+		ByteBuffer sendData = ByteBuffer.allocate(length);
+		sendData.put(header.array());
+		if(pak_crypt != null) sendData.put(pak_crypt);
+		sendData.rewind();
+		return sendData;
+	}
 }
