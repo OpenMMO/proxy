@@ -34,14 +34,14 @@ public class Proxy {
 			System.out.println(rnd.prng());
 		}*/
 		Pak150.test();
-		while(System.currentTimeMillis() % 1000 != 0){
+		/*while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
 		}
 		serverAddress = InetAddress.getByName("192.168.1.6");
 		parseArgs(args);
 		createSockets();
 		startSendPiles();
-		openTunnels();
+		openTunnels();*/
 		//Sniffer.main(null);
 	}
 

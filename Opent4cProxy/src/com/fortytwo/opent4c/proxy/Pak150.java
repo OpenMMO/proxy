@@ -10,6 +10,7 @@ import com.fortytwo.opent4c.tools.CalendarUtils;
 import com.fortytwo.opent4c.tools.MSRand;
 
 public class Pak150 {
+	private boolean isTest = false;
 	private DatagramPacket packet;
 	private long timeStamp = -1;
 	private byte fragmentID = -1;
@@ -32,7 +33,9 @@ public class Pak150 {
 	private int type = -1;
 	private ByteBuffer header = ByteBuffer.allocate(16);
 
-	public Pak150(){}
+	public Pak150(){
+		isTest = true;
+	}
 	
 	
 	/**
@@ -164,6 +167,7 @@ public class Pak150 {
 	 * pak type and checksum are BIG ENDIAN.
 	 */
 	public static void test(){
+		System.out.println("[TEST PAK 150 ]");
 		Pak150 test = new Pak150();
 		ByteBuffer seedbuf = ByteBuffer.allocate(4);
 		byte[] s = new byte[4];
@@ -175,7 +179,8 @@ public class Pak150 {
 		seedbuf.put(s);
 		seedbuf.rewind();
 		test.seed = seedbuf.getInt();
-		
+		System.out.println("[SEED BYTEBUFFER : "+ByteArrayToHexString.print(seedbuf.array()));
+		System.out.println("[SEED BYTES : "+ByteArrayToHexString.print(new byte[]{(byte)(test.seed>>24 & 0xFF),(byte)(test.seed>>16 & 0xFF),(byte)(test.seed>>8 & 0xFF),(byte)(test.seed & 0xFF)}));
 		test.pak = ByteBuffer.allocate(15);
 		test.pak.put((byte) 0x54);
 		test.pak.put((byte) 0x04);
@@ -196,7 +201,6 @@ public class Pak150 {
 		
 		test.decrypt_150();
 		
-		System.out.println("[TEST PAK 150 ]");
 		System.out.println("[TEST TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(test.type>>8 & 0xFF),(byte)(test.type & 0xFF)})+"]");
 		System.out.println("TYPE should be 00 42");
 
