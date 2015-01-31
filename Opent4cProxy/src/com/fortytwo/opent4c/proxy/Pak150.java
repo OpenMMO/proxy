@@ -171,16 +171,15 @@ public class Pak150 {
 		Pak150 test = new Pak150();
 		ByteBuffer seedbuf = ByteBuffer.allocate(4);
 		byte[] s = new byte[4];
-		s[0] = (byte) 0x5D;
-		s[1] = (byte) 0x84;
-		s[2] = (byte) 0xFB;
-		s[3] = (byte) 0x00;
+		s[3] = (byte) 0x5D;
+		s[2] = (byte) 0x84;
+		s[1] = (byte) 0xFB;
+		s[0] = (byte) 0x00;
 		seedbuf.order(ByteOrder.LITTLE_ENDIAN);
 		seedbuf.put(s);
 		seedbuf.rewind();
 		test.seed = seedbuf.getInt();
-		System.out.println("[SEED BYTEBUFFER : "+ByteArrayToHexString.print(seedbuf.array()));
-		System.out.println("[SEED BYTES : "+ByteArrayToHexString.print(new byte[]{(byte)(test.seed>>24 & 0xFF),(byte)(test.seed>>16 & 0xFF),(byte)(test.seed>>8 & 0xFF),(byte)(test.seed & 0xFF)}));
+		System.out.println("SEED : "+ByteArrayToHexString.print(seedbuf.array()));
 		test.pak = ByteBuffer.allocate(15);
 		test.pak.put((byte) 0x54);
 		test.pak.put((byte) 0x04);
@@ -203,7 +202,15 @@ public class Pak150 {
 		
 		System.out.println("[TEST TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(test.type>>8 & 0xFF),(byte)(test.type & 0xFF)})+"]");
 		System.out.println("TYPE should be 00 42");
-
+		System.out.println("TEST PAK DECRYPTED "+ByteArrayToHexString.print(test.pak.array()));
+		byte[] d = new byte[9];
+		test.pak.rewind();
+		test.pak.get();
+		test.pak.get();
+		test.pak.get();
+		test.pak.get();
+		test.pak.get(d, 0, 9);
+		System.out.println("TEST PAK DECRYPTED "+new String(d));
 	}
 	
 
@@ -227,7 +234,8 @@ public class Pak150 {
 		b1 = (byte) ((seed>>16) & 0xFF);
 		b2 = (byte) ((seed>>8) & 0xFF);
 		b3 = (byte) ((seed) & 0xFF);
-		int shiftedSeed = ((int)(b0 & 0xFF)<<24) | ((int)(b3 & 0xFF)<<16) | ((int)(b1 & 0xFF)<<8) | (int)(b2 & 0xFF);
+		int shiftedSeed = ((int)(b3 & 0xFF)<<24) | ((int)(b0 & 0xFF)<<16) | ((int)(b2 & 0xFF)<<8) | (int)(b1 & 0xFF);
+		if(isTest)System.out.println("SHIFTED SEED "+shiftedSeed);
 		MSRand srand = new MSRand(shiftedSeed);
 		   
 		// now generate the crypto tables for the given datagram length
@@ -235,19 +243,27 @@ public class Pak150 {
 		for (index = 0; index < 10; index++){
 			stack1[index] = (byte) srand.prng();
 			stack2[index] = (byte) srand.prng();
+			if(isTest)System.out.println("STACK1 "+index+" "+stack1[index]);
+			if(isTest)System.out.println("STACK2 "+index+" "+stack2[index]);
 		}
 		// xor table
 		for (index = 0 ; index < pak.array().length ; index++)
 		{
-			crypto.xor[index] = (byte) stack2[srand.prng() % 10];
-			crypto.xor[index] *= (byte) stack1[srand.prng() % 10];
+			crypto.xor[index] = (int) stack2[srand.prng() % 10]&0xFF;
+			if(isTest)System.out.println("TMP "+index+" "+crypto.xor[index]);
+			crypto.xor[index] *= (int) stack1[srand.prng() % 10]&0xFF;
+			if(isTest)System.out.println("TMP "+index+" "+crypto.xor[index]);
 			crypto.xor[index] += srand.prng();
+			if(isTest)System.out.println("XOR "+index+" "+crypto.xor[index]);
 		}
 		// offset & algo tables
 		for (index = 0; index < pak.array().length; index++){
 			crypto.offsets[index] = srand.prng() % pak.array().length;
 			if (crypto.offsets[index] == index) crypto.offsets[index] = (index == 0 ? 1 : 0);
+			if(isTest)System.out.println("OFFSETS "+index+" "+crypto.offsets[index]);
 			crypto.algo[index] = srand.prng() % 21;
+			if(isTest)System.out.println("ALGO "+index+" "+crypto.algo[index]);
+
 		}
 		// cryptographic tables are generated, now apply the algorithm
 		for (index=pak.array().length-1 ; index>=0; index--) {

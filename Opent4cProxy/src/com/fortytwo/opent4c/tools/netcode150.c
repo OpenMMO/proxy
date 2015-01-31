@@ -48,7 +48,7 @@ void main (void)
 
  	printf("[NETCODE 1.50 C TEST]\n");
  	printf("[SEED %X]\n",seed);
- 	printf("[SHIFTED SEED %X]\n",  (int) (((unsigned char *) &seed)[0] << 24)
+ 	printf("[SHIFTED SEED %d]\n",  (int) (((unsigned char *) &seed)[0] << 24)
           | (int) (((unsigned char *) &seed)[3] << 16)
           | (int) (((unsigned char *) &seed)[1] << 8)
           | (int) (((unsigned char *) &seed)[2]));
@@ -66,8 +66,8 @@ void main (void)
    {
       stack1[index] = (char) prng ();
       stack2[index] = (char) prng ();
-      printf("[STACK1[%d] %X]\n",index, stack1[index]);
-      printf("[STACK2[%d] %X]\n",index, stack2[index]);
+      printf("[STACK1[%d] %d]\n",index, stack1[index]);
+      printf("[STACK2[%d] %d]\n",index, stack2[index]);
 
    }
 
@@ -75,9 +75,11 @@ void main (void)
    for (index = 0; index < data_size; index++)
    {
       xor[index] = (unsigned char) stack2[prng () % 10];
+      printf("[TMP[%d] %d]\n",index, xor[index]);
       xor[index] *= (unsigned char) stack1[prng () % 10];
+      printf("[TMP[%d] %d]\n",index, xor[index]);
       xor[index] += prng ();
-      printf("[XOR[%d] %X]\n",index, xor[index]);
+      printf("[XOR[%d] %d]\n",index, xor[index]);
 
    }
 
