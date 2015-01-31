@@ -171,10 +171,10 @@ public class Pak150 {
 		Pak150 test = new Pak150();
 		ByteBuffer seedbuf = ByteBuffer.allocate(4);
 		byte[] s = new byte[4];
-		s[0] = (byte) 0x00;
-		s[1] = (byte) 0xFB;
-		s[2] = (byte) 0x84;
-		s[3] = (byte) 0x5D;
+		s[0] = (byte) 0x5D;
+		s[1] = (byte) 0x84;
+		s[2] = (byte) 0xFB;
+		s[3] = (byte) 0x00;
 		seedbuf.order(ByteOrder.LITTLE_ENDIAN);
 		seedbuf.put(s);
 		seedbuf.rewind();

@@ -23,6 +23,8 @@ void main (void)
    unsigned int offsets[15];
    unsigned int algos[15];
    unsigned char data[] = {0x54, 0x04, 0x2F, 0xDE, 0x9D, 0xF3, 0xD5, 0xA8, 0x3C, 0x2C, 0x58, 0x2F, 0x3F, 0x35, 0x71};
+   signed short sum;
+
 
     // Microsoft srand()
   	int sprng(unsigned long seed){
@@ -33,6 +35,15 @@ void main (void)
  	int prng(void){
  		next = (next * 0x343fd) + 0x269ec3;
  		return ((next>>16) & 0x7fff);
+ 	}
+
+ 	void check(void)
+ 	{
+ 	   // this function computes and returns the pak data's checksum
+ 	   sum = 0; // start at zero
+ 	   // for each byte of data...
+ 	   for (index = 0; index < data_size-2; index++)
+ 	      sum += (unsigned char) (~data[index]); // add its inverse value to the checksum
  	}
 
  	printf("[NETCODE 1.50 C TEST]\n");
@@ -143,13 +154,15 @@ void main (void)
          data[index] ^= (xor[index] & 0xFF); // end of stream
    }
 
-   // in the 1.50 protocol, the checksum info is at the trailing end of the pak.
-   //checksum = *(unsigned short *) &data[data_size - 2]; // so get it from there...
-   //printf("[CHECKSUM %X]\n",checksum);
-   //data_size -= 2; // ...and correct the data size
    printf("[DATA ");
    for (index = 0 ; index < data_size ; index ++){
 	   printf("%X ", data[index]);
    }
-   printf("]\n"); // finished, pak is decrypted
+   printf("]\n[MOTD LENGTH %d]\n[MOTD : ",(((int)(data[2]<<8)&0xFF00)|(int)(data[3])&0xFF));
+   for (index = 4 ; index < data_size-2 ; index ++){
+	   printf("%c", data[index]);
+   }
+   printf("]\n[TYPE %X %X]\n[CHECK %d]\n",data[0],data[1],(((int)(data[14]<<8)&0xFF00)|(int)(data[13])&0xFF));
+   check();
+   printf("[SUM %d]\n",sum);// finished, pak is decrypted
 }
