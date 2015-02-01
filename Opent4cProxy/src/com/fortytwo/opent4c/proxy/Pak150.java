@@ -10,29 +10,31 @@ import com.fortytwo.opent4c.tools.CalendarUtils;
 import com.fortytwo.opent4c.tools.MSRand;
 
 public class Pak150 {
-	private boolean isTest = false;
-	private DatagramPacket packet;
-	private long timeStamp = -1;
-	private byte fragmentID = -1;
-	private byte bitMask = -1;
-	private boolean isServerToClient = false;
-	private boolean isPong = false;
-	private boolean isPing = false;
-	private boolean isFragment = false;
-	private boolean isFirstFragment = false;
-	private boolean isLastFragment = false;
-	private short length = 16;//Default 16 is pong length.
-	private long datagramID = -1;
-	private int seed = 0;
-	private ByteBuffer pak = null;
-	private byte[] pak_crypt = null;
-	private int firstPakID = -1;
-	private int pongID = -1;
-	private long micros = -1;
-	private short checksum = -1;
-	private int type = -1;
-	private ByteBuffer header = ByteBuffer.allocate(16);
+	private boolean isTest = false;//only used to print infos while decrypting, for testing purpose
+	private boolean isServerToClient = false;//direction of the pak
+	private DatagramPacket packet;//not needed when everything will be working
+	private long timeStamp = -1;//System.currentTimeMillis() just after we received the pak
+	private long micros = -1;//((System.nanoTime()-Proxy.startTime)%1000000)/1000 juste after we received the pak
+	private ByteBuffer header = ByteBuffer.allocate(16);//will be filled with bytes 0 to 15 of received data
+	private byte fragmentID = -1;//byte 0 of header, == 0 for non fragmented paks
+	private boolean isLastFragment = false;//if fragmentID != 0, this pak is the last of a fragmented message
+	//byte 1 is a bitmask, it sets these 3 booleans:
+	private boolean isPong = false;//if pak is a pong message
+	private boolean isPing = false;//if pak is needs a pong in return
+	private boolean isFragment = false;//if the pak is part of a fragmented message
+	private short length;//byte 2 and 3 of header. == 0 for pong paks so it has to be manually set to 16, otherwise == pak length.
+	private int datagramID = -1;//bytes 4 to 7 of header. for pong paks, tells the id of the corresponding ping pak, otherwise it the datagram's ID.
+	private int firstPakID = -1;//bytes 8 to 11 of header. tells the id of the first pak of a fragmented message, otherwise == 0
+	private boolean isFirstFragment = false;//if datagramID == firstPakID, this pak is the first of a fragmented message, otherwise == 0
+	private int seed = 0;//bytes 12 to 15 of header, it's the seed for decrypting the data of this pak.
+	private ByteBuffer pak = null;//bytes 16 and following. it's filled with crypted data and decrypted.
+	private byte[] pak_crypt = null;//original data, not need when everyhing will be working
+	private int type = -1;//byte 0 and 1 of decrypted data, we get it from pak after it's been decrypted.
+	private boolean valid = false;//set to true if the checksum is valid after we've decrypted the data.
 
+	/**
+	 * only for testing purpose
+	 */
 	public Pak150(){
 		isTest = true;
 	}
@@ -46,13 +48,13 @@ public class Pak150 {
 	 * @param microseconds
 	 */
 	public Pak150(DatagramPacket pack, boolean direction, long stamp, long microseconds) {
-		header.put(pack.getData(),0,16);
-		header.order(ByteOrder.LITTLE_ENDIAN);
-		header.rewind();
 		timeStamp = stamp;
 		micros = microseconds;
 		isServerToClient = direction;
 		packet = pack;
+		header.put(pack.getData(),0,16);
+		header.order(ByteOrder.LITTLE_ENDIAN);
+		header.rewind();
 		decodeHeader(header);
 		pak = ByteBuffer.allocate(length-16);
 		pak.put(packet.getData(), 16, length-16);
@@ -60,10 +62,10 @@ public class Pak150 {
 		pak_crypt = pak.array().clone();
 		if(!isFragment) {
 			if(!isPong){
-				checksum = decrypt_150();
+				decrypt_150();
 			}
 		}else{
-			System.err.println("FRAGMENT : "+ByteArrayToBinaryString.toBinary(bitMask));
+			System.err.println("FRAGMENT : "+isFragment);
 			//TODO manage fragments
 		}
 		print();
@@ -75,12 +77,12 @@ public class Pak150 {
 	 */
 	private void decodeHeader(ByteBuffer header) {
 		fragmentID = header.get();
-		bitMask = header.get();
+		byte bitMask = header.get();
 		length = header.getShort();
 		isPong = isPong(bitMask);
 		if(isPong) {
 			length = 16;
-			pongID = header.getInt();
+			datagramID = header.getInt();
 		}else{		
 			isPing = isPing(bitMask);
 			isFragment = isFragment(bitMask);
@@ -119,7 +121,7 @@ public class Pak150 {
 			sb.append("[CLIENT->SERVER]");
 		}
 		if(isPong){
-			sb.append("[PONG "+pongID+"]");
+			sb.append("[PONG "+datagramID+"]");
 			System.out.println(sb.toString());
 			return;
 		}
@@ -147,7 +149,6 @@ public class Pak150 {
 		}else{
 			sb.append("[TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(type>>8 & 0xFF),(byte)(type & 0xFF)})+"]");
 		}
-		sb.append("[CHK "+checksum+"|"+checksum_150(pak)+"]");
 		sb.append("[SRC "+ByteArrayToHexString.print(packet.getData())+"]");
 		System.out.println(sb.toString());
 	}
@@ -201,14 +202,13 @@ public class Pak150 {
 	 * Decrypts 1.50 data
 	 * @return
 	 */
-	public short decrypt_150 (){
+	public void decrypt_150 (){
 		byte[] stack1 = new byte[10];
 		byte[] stack2 = new byte[10];
 		byte pak_offset;
 		byte pak_index;
 		int index;
 		int algo;
-		short checksum = -1;
 		TCryptoTable crypto = new TCryptoTable(pak.array().length);
 		// initialize the system's pseudo-random number generator from the seed given in the datagram
 		// (they apparently swapped the bytes in an attempt to confuse the reverse-engineerers)
@@ -297,13 +297,23 @@ public class Pak150 {
 			}
 		}
 		// in the 1.50 protocol, the checksum info is at the trailing end of the pak.
-		checksum = (short) ((pak.array()[pak.array().length - 2]<< 8) | (pak.array()[pak.array().length-1])); // so get it from there...
+		short checksum = (short) ((pak.array()[pak.array().length - 2]<< 8) | (pak.array()[pak.array().length-1])); // so get it from there...
 		pak.rewind();
 		type = pak.getShort();
-		return checksum;
+		pak.limit(pak.limit()-2);
+		valid = checksum_150(pak, checksum);
+		pak.rewind();
+		pak.compact();
+		pak.rewind();
 	}
 	
-	private short checksum_150 (ByteBuffer decrypted)
+	/**
+	 * checks if we decrypted data correctly
+	 * @param decrypted
+	 * @param checksum
+	 * @return
+	 */
+	private boolean checksum_150 (ByteBuffer decrypted, short checksum)
 	{
 	   // this function computes and returns the pak data's checksum
 	   int index;
@@ -314,7 +324,9 @@ public class Pak150 {
 	   for (index = 0; index < pak.array().length; index++){
 	      sum += (byte) (pak.array()[index]); // add its inverse value to the checksum
 	   }
-	   return sum; // return the checksum we found
+	   if(sum == checksum)return true;
+	   System.err.println("BAD CHeCKSUM : "+sum+"!="+checksum);
+	   return false;
 	}
 
 	/**
@@ -328,123 +340,4 @@ public class Pak150 {
 		sendData.rewind();
 		return sendData;
 	}
-	
-/* FOLLOWING IS C CODE WICH IS SUPPOSED TO BE OK
-
-signed short Pak_SwitchEncryptionOff_150 (pak_t *pak, unsigned long seed)
-{
-   // the 1.50 protocol cryptography uses extensively the standard C random number generator,
-   // which is a VERY BAD idea, since its implementation may differ from system to system !!!
-
-   char stack1[10];
-   char stack2[10];
-   unsigned char a;
-   unsigned char c;
-   char *edi;
-   char *ebp;
-   int index;
-   unsigned int algo;
-   signed short checksum;
-
-   // initialize the system's pseudo-random number generator from the seed given in the datagram
-   // (they apparently swapped the bytes in an attempt to confuse the reverse-engineerers)
-   srand (  (int) (((unsigned char *) &seed)[0] << 24)
-          | (int) (((unsigned char *) &seed)[3] << 16)
-          | (int) (((unsigned char *) &seed)[1] << 8)
-          | (int) (((unsigned char *) &seed)[2]));
-
-   // now generate the crypto tables for the given datagram length
-
-   // stack sequences
-   for (index = 0; index < 10; index++)
-   {
-      stack1[index] = (char) rand ();
-      stack2[index] = (char) rand ();
-   }
-
-   // xor table
-   for (index = 0; index < pak->data_size; index++)
-   {
-      cryptotables_150.xor[index] = (unsigned char) stack2[rand () % 10];
-      cryptotables_150.xor[index] *= (unsigned char) stack1[rand () % 10];
-      cryptotables_150.xor[index] += rand ();
-   }
-
-   // offset & algo tables
-   for (index = 0; index < pak->data_size; index++)
-   {
-      cryptotables_150.offsets[index] = rand () % pak->data_size;
-      if (cryptotables_150.offsets[index] == (unsigned int) index)
-         cryptotables_150.offsets[index] = (index == 0 ? 1 : 0);
-
-      cryptotables_150.algo[index] = rand () % 21;
-   }
-
-   // cryptographic tables are generated, now apply the algorithm
-   for (index = pak->data_size - 1; index >= 0; index--)
-   {
-      algo = cryptotables_150.algo[index];
-      ebp = &pak->data[cryptotables_150.offsets[index]];
-      edi = &pak->data[index];
-
-      a = *ebp;
-      c = *edi;
-
-      if      (algo == 0)  { *edi = ((a ^ c) & 0x0F) ^ c;  *ebp = ((a ^ c) & 0x0F) ^ a;  }
-      else if (algo == 1)  { *edi = ((a ^ c) & 0x0F) ^ c;  *ebp = (a >> 4) | (c << 4);   }
-      else if (algo == 2)  { *edi = (c >> 4) | (c << 4);   *ebp = (a >> 4) | (a << 4);   }
-      else if (algo == 3)  { *edi = (a >> 4) | (c << 4);   *ebp = ((a ^ c) & 0x0F) ^ c;  }
-      else if (algo == 4)  { *edi = (a & 0x0F) | (c << 4); *ebp = (a & 0xF0) | (c >> 4); }
-      else if (algo == 5)  { *edi = (c & 0xF0) | (a >> 4); *ebp = (a << 4) | (c & 0x0F); }
-      else if (algo == 6)  { *edi = (a >> 4) | (c << 4);   *ebp = (a << 4) | (c >> 4);   }
-      else if (algo == 7)  { *edi = (c & 0xF0) | (a >> 4); *ebp = (a & 0x0F) | (c << 4); }
-      else if (algo == 8)  { *edi = (a & 0x0F) | (c << 4); *ebp = (c & 0xF0) | (a >> 4); }
-      else if (algo == 9)  { *edi = (a & 0xF0) | (c >> 4); *ebp = (a & 0x0F) | (c << 4); }
-      else if (algo == 10) { *edi = (a << 4) | (c & 0x0F); *ebp = (a & 0xF0) | (c >> 4); }
-      else if (algo == 11) { *edi = (a << 4) | (c >> 4);   *ebp = ((a ^ c) & 0x0F) ^ a;  }
-      else if (algo == 12) { *edi = (a >> 4) | (a << 4);   *ebp = (c >> 4) | (c << 4);   }
-      else if (algo == 13) { *edi = a;                     *ebp = c;                     }
-      else if (algo == 14) { *edi = (a & 0xF0) | (c >> 4); *ebp = (a << 4) | (c & 0x0F); }
-      else if (algo == 15) { *edi = ((a ^ c) & 0x0F) ^ a;  *ebp = ((a ^ c) & 0x0F) ^ c;  }
-      else if (algo == 16) { *edi = a;                     *ebp = (c >> 4) | (c << 4);   }
-      else if (algo == 17) { *edi = (a << 4) | (c & 0x0F); *ebp = (c & 0xF0) | (a >> 4); }
-      else if (algo == 18) { *edi = (a << 4) | (c >> 4);   *ebp = (a >> 4) | (c << 4);   }
-      else if (algo == 19) { *edi = (a >> 4) | (a << 4);   *ebp = c;                     }
-      else if (algo == 20) { *edi = ((a ^ c) & 0x0F) ^ a;  *ebp = (a << 4) | (c >> 4);   }
-   }
-
-   // and finally, quadruple-XOR the data out
-   for (index = pak->data_size - 1; index >= 0; index--)
-   {
-      if (index <= pak->data_size - 4)
-      {
-         pak->data[index + 0] ^= (cryptotables_150.xor[index] & 0x000000FF); // we can XOR 4 bytes in a row
-         pak->data[index + 1] ^= (cryptotables_150.xor[index] & 0x0000FF00) >> 8;
-         pak->data[index + 2] ^= (cryptotables_150.xor[index] & 0x00FF0000) >> 16;
-         pak->data[index + 3] ^= (cryptotables_150.xor[index] & 0xFF000000) >> 24;
-      }
-      else if (index == pak->data_size - 3)
-      {
-         pak->data[index + 0] ^= (cryptotables_150.xor[index] & 0x0000FF); // we can XOR 3 bytes in a row
-         pak->data[index + 1] ^= (cryptotables_150.xor[index] & 0x00FF00) >> 8;
-         pak->data[index + 2] ^= (cryptotables_150.xor[index] & 0xFF0000) >> 16;
-      }
-      else if (index == pak->data_size - 2)
-      {
-         pak->data[index + 0] ^= (cryptotables_150.xor[index] & 0x00FF); // we can XOR 2 bytes in a row
-         pak->data[index + 1] ^= (cryptotables_150.xor[index] & 0xFF00) >> 8;
-      }
-      else if (index == pak->data_size - 1)
-         pak->data[index] ^= (cryptotables_150.xor[index] & 0xFF); // end of stream
-   }
-
-   // in the 1.50 protocol, the checksum info is at the trailing end of the pak.
-   checksum = *(unsigned short *) &pak->data[pak->data_size - 2]; // so get it from there...
-   pak->data_size -= 2; // ...and correct the data size
-
-   return (checksum); // finished, pak is decrypted
-}
-
-*/
-
 }

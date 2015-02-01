@@ -33,15 +33,15 @@ public class Proxy {
 		for (int i = 0 ; i<100 ; i++){
 			System.out.println(rnd.prng());
 		}*/
-		Pak150.test();
-		/*while(System.currentTimeMillis() % 1000 != 0){
+		//Pak150.test();
+		while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
 		}
 		serverAddress = InetAddress.getByName("192.168.1.6");
 		parseArgs(args);
 		createSockets();
 		startSendPiles();
-		openTunnels();*/
+		openTunnels();
 		//Sniffer.main(null);
 	}
 
