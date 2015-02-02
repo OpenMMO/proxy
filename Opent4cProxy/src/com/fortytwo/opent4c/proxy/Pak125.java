@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import com.fortytwo.opent4c.tools.ByteArrayToBinaryString;
-import com.fortytwo.opent4c.tools.ByteArrayToHexString;
+import com.fortytwo.opent4c.tools.HexString;
 import com.fortytwo.opent4c.tools.CalendarUtils;
 
 public class Pak125 {
@@ -115,7 +115,7 @@ public class Pak125 {
 		}
 		if(isPong){
 			sb.append("[PONG "+pongID+"]");
-			sb.append(ByteArrayToHexString.print(packet.getData()));
+			sb.append(HexString.from(packet.getData()));
 			System.out.println(sb.toString());
 			return;
 		}
@@ -145,7 +145,7 @@ public class Pak125 {
 		}else{
 			sb.append("[TYPE "+type+"]");
 		}
-		sb.append("["+ByteArrayToHexString.print(pak.array())+"]");
+		sb.append("["+HexString.from(pak.array())+"]");
 		//sb.append(ByteArrayToHexString.print(packet.getData()));
 		System.out.println(sb.toString());
 	}
@@ -158,7 +158,7 @@ public class Pak125 {
 		pak[2] = (byte) 0x8B;
 		pak[3] = (byte) 0x11;
 		crypt125(pak, seed);
-		System.out.println("[TEST TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(type>>8 & 0xFF),(byte)(type & 0xFF)})+"]");
+		System.out.println("[TEST TYPE "+HexString.from(new byte[]{(byte)(type>>8 & 0xFF),(byte)(type & 0xFF)})+"]");
 	}
 	
 	/**

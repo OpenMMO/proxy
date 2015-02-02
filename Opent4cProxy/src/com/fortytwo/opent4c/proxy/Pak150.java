@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import com.fortytwo.opent4c.tools.ByteArrayToBinaryString;
-import com.fortytwo.opent4c.tools.ByteArrayToHexString;
+import com.fortytwo.opent4c.tools.HexString;
 import com.fortytwo.opent4c.tools.CalendarUtils;
 import com.fortytwo.opent4c.tools.MSRand;
 
@@ -27,9 +27,9 @@ public class Pak150 {
 	private int firstPakID = -1;//bytes 8 to 11 of header. tells the id of the first pak of a fragmented message, otherwise == 0
 	private boolean isFirstFragment = false;//if datagramID == firstPakID, this pak is the first of a fragmented message, otherwise == 0
 	private int seed = 0;//bytes 12 to 15 of header, it's the seed for decrypting the data of this pak.
-	private ByteBuffer pak = null;//bytes 16 and following. it's filled with crypted data and decrypted.
+	private ByteBuffer pak = null;//bytes 16 and following. it's first filled with crypted data and then with decrypted.
 	private byte[] pak_crypt = null;//original data, not need when everyhing will be working
-	private int type = -1;//byte 0 and 1 of decrypted data, we get it from pak after it's been decrypted.
+	private short type = -1;//byte 0 and 1 of decrypted data, we get it from pak after it's been decrypted.
 	private boolean valid = false;//set to true if the checksum is valid after we've decrypted the data.
 
 	/**
@@ -41,13 +41,14 @@ public class Pak150 {
 	
 	
 	/**
-	 * T4C 1.50 datagram packet
+	 * T4C 1.50 datagram packet, received encrypted
 	 * @param pack
 	 * @param direction : true = server->client
 	 * @param stamp
 	 * @param microseconds
 	 */
 	public Pak150(DatagramPacket pack, boolean direction, long stamp, long microseconds) {
+		isTest = true;//as long as we do live tests, enables verbose mode
 		timeStamp = stamp;
 		micros = microseconds;
 		isServerToClient = direction;
@@ -60,6 +61,7 @@ public class Pak150 {
 		pak.put(packet.getData(), 16, length-16);
 		pak.rewind();
 		pak_crypt = pak.array().clone();
+		if(isTest)System.out.println("SOURCE "+HexString.from(pack.getData()));
 		if(!isFragment) {
 			if(!isPong){
 				decrypt_150();
@@ -68,7 +70,7 @@ public class Pak150 {
 			System.err.println("FRAGMENT : "+isFragment);
 			//TODO manage fragments
 		}
-		print();
+		//print();
 	}
 
 	/**
@@ -113,6 +115,7 @@ public class Pak150 {
 	 * prints relevant infos about packet on standard output
 	 */
 	private void print() {
+		//TODO separate fx for different pak types
 		StringBuilder sb = new StringBuilder();
 		sb.append(CalendarUtils.getTimeStringFromLongMillis(timeStamp,micros));
 		if(isServerToClient){
@@ -142,14 +145,14 @@ public class Pak150 {
 		}else{
 			sb.append("["+"LENGTH "+length+"]"+"[SEED "+seed+"]");
 		}
-		sb.append("[SRC "+ByteArrayToHexString.print(pak_crypt)+"]");
-		sb.append("[DATA "+ByteArrayToHexString.print(pak.array())+"]");
+		sb.append("[SRC "+HexString.from(pak_crypt)+"]");
+		sb.append("[DATA "+HexString.from(pak.array())+"]");
 		if(isServerToClient){
-			sb.append("[TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(type>>8 & 0xFF),(byte)(type & 0xFF)})+"]");
+			sb.append("[TYPE "+HexString.from(type)+"]");
 		}else{
-			sb.append("[TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(type>>8 & 0xFF),(byte)(type & 0xFF)})+"]");
+			sb.append("[TYPE "+HexString.from(type)+"]");
 		}
-		sb.append("[SRC "+ByteArrayToHexString.print(packet.getData())+"]");
+		sb.append("[SRC "+HexString.from(packet.getData())+"]");
 		System.out.println(sb.toString());
 	}
 	
@@ -177,7 +180,7 @@ public class Pak150 {
 		seedbuf.put(s);
 		seedbuf.rewind();
 		test.seed = seedbuf.getInt();
-		System.out.println("SEED : "+ByteArrayToHexString.print(seedbuf.array()));
+		System.out.println("SEED : "+HexString.from(seedbuf.array()));
 		test.pak = ByteBuffer.allocate(103);
 		//test.pak.put(new byte[] {0x54, 0x04, 0x2F, (byte) 0xDE , (byte) 0x9D, (byte) 0xF3, (byte) 0xD5, (byte) 0xA8, 0x3C, 0x2C, 0x58, 0x2F, 0x3F, 0x35, 0x71});
 		test.pak.put(new byte[] {0x0C, (byte) 0xFC, (byte) 0xF9, (byte) 0xEC, (byte) 0xEA, 0x3C, 0x33, (byte) 0x8A, 0x48, 0x79, 0x1E, (byte) 0xD7, 0x49, 0x47, (byte) 0x96, (byte) 0xD4, (byte) 0x89, 0x34, (byte) 0xDF, 0x18, 0x3E, 0x52, (byte) 0xA3, 0x22, 0x6C, (byte) 0xEC, 0x25, 0x2E, (byte) 0xE9, (byte) 0xF2, (byte) 0x92, (byte) 0xED, (byte) 0xD5, (byte) 0xD2, 0x54, (byte) 0xE7, 0x02, (byte) 0xC0, 0x17, (byte) 0xA3, 0x39, 0x2A, (byte) 0x8C, 0x4E, (byte) 0xE9, 0x6A, 0x2A, (byte) 0xDA, (byte) 0xC7, 0x13, 0x0E, 0x43, (byte) 0xC7, (byte) 0xC0, 0x3E, 0x54, (byte) 0x99, 0x1A, 0x7D, (byte) 0xE6, (byte) 0xF2, 0x41, (byte) 0xF2, (byte) 0xBF, 0x4F, 0x20, 0x13, (byte) 0xCD, 0x47, (byte) 0x83, (byte) 0xF2, 0x42, 0x53, (byte) 0xF9, 0x71, (byte) 0xE8, (byte) 0x82, (byte) 0xAB, (byte) 0xB9, 0x16, (byte) 0x85, (byte) 0xA2, 0x54, 0x20, 0x4E, 0x2E, 0x16, 0x3E, 0x19, 0x52, (byte) 0xBD, 0x1B, (byte) 0xED, 0x70, 0x5A, (byte) 0xC4, 0x66, 0x09, (byte) 0xF2, (byte) 0xB1, 0x6E, 0x6D, (byte) 0x94});
@@ -185,15 +188,15 @@ public class Pak150 {
 		
 		test.decrypt_150();
 		
-		System.out.println("[TEST TYPE "+ByteArrayToHexString.print(new byte[]{(byte)(test.type>>8 & 0xFF),(byte)(test.type & 0xFF)})+"]");
-		System.out.println("TEST PAK DECRYPTED "+ByteArrayToHexString.print(test.pak.array()));
-		byte[] d = new byte[9];
+		System.out.println("[TEST TYPE "+HexString.from(new byte[]{(byte)(test.type>>8 & 0xFF),(byte)(test.type & 0xFF)})+"]");
+		System.out.println("TEST PAK DECRYPTED "+HexString.from(test.pak.array()));
+		byte[] d = new byte[test.pak.array().length-6];
 		test.pak.rewind();
 		test.pak.get();
 		test.pak.get();
 		test.pak.get();
 		test.pak.get();
-		test.pak.get(d, 0, 9);
+		test.pak.get(d, 0, test.pak.array().length-6);
 		System.out.println("TEST PAK DECRYPTED "+new String(d));
 	}
 	
@@ -218,7 +221,7 @@ public class Pak150 {
 		b2 = (byte) ((seed>>8) & 0xFF);
 		b3 = (byte) ((seed) & 0xFF);
 		int shiftedSeed = ((int)(b3 & 0xFF)<<24) | ((int)(b0 & 0xFF)<<16) | ((int)(b2 & 0xFF)<<8) | (int)(b1 & 0xFF);
-		if(isTest)System.out.println("SHIFTED SEED "+shiftedSeed);
+		//if(isTest)System.out.println("SHIFTED SEED "+HexString.from(shiftedSeed));
 		MSRand srand = new MSRand(shiftedSeed);
 		   
 		// now generate the crypto tables for the given datagram length
@@ -226,26 +229,26 @@ public class Pak150 {
 		for (index = 0; index < 10; index++){
 			stack1[index] = (byte) srand.prng();
 			stack2[index] = (byte) srand.prng();
-			if(isTest)System.out.println("STACK1 "+index+" "+stack1[index]);
-			if(isTest)System.out.println("STACK2 "+index+" "+stack2[index]);
+			//if(isTest)System.out.println("STACK1("+index+") "+HexString.from(stack1[index]));
+			//if(isTest)System.out.println("STACK2("+index+") "+HexString.from(stack2[index]));
 		}
 		// xor table
 		for (index = 0 ; index < pak.array().length ; index++)
 		{
 			crypto.xor[index] = (int) stack2[srand.prng() % 10]&0xFF;
-			if(isTest)System.out.println("TMP "+index+" "+crypto.xor[index]);
+			//if(isTest)System.out.println("TMP("+index+") "+HexString.from(crypto.xor[index]));
 			crypto.xor[index] *= (int) stack1[srand.prng() % 10]&0xFF;
-			if(isTest)System.out.println("TMP "+index+" "+crypto.xor[index]);
+			//if(isTest)System.out.println("TMP("+index+") "+HexString.from(crypto.xor[index]));
 			crypto.xor[index] += srand.prng();
-			if(isTest)System.out.println("XOR "+index+" "+crypto.xor[index]);
+			//if(isTest)System.out.println("XOR("+index+") "+HexString.from(crypto.xor[index]));
 		}
 		// offset & algo tables
 		for (index = 0; index < pak.array().length; index++){
 			crypto.offsets[index] = srand.prng() % pak.array().length;
 			if (crypto.offsets[index] == index) crypto.offsets[index] = (index == 0 ? 1 : 0);
-			if(isTest)System.out.println("OFFSETS "+index+" "+crypto.offsets[index]);
+			//if(isTest)System.out.println("OFFSETS("+index+") "+HexString.from(crypto.offsets[index]));
 			crypto.algo[index] = srand.prng() % 21;
-			if(isTest)System.out.println("ALGO "+index+" "+crypto.algo[index]);
+			//if(isTest)System.out.println("ALGO("+index+") "+HexString.from(crypto.algo[index]));
 
 		}
 		// cryptographic tables are generated, now apply the algorithm
@@ -253,80 +256,94 @@ public class Pak150 {
 			algo = crypto.algo[index];
 			pak_offset = pak.array()[crypto.offsets[index]];
 			pak_index = pak.array()[index];
-			if 	  (algo == 0)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset); }
-		      else if (algo == 1)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset >> 4) | (pak_index << 4)); 			}
-		      else if (algo == 2)  { pak.array()[index] = (byte) ((pak_index >> 4) | (pak_index << 4))			;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset >> 4) | (pak_offset << 4)); 			}
-		      else if (algo == 3)  { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_index << 4))			;	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	}
-		      else if (algo == 4)  { pak.array()[index] = (byte) ((pak_offset & 0x0F) | (pak_index << 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0xF0) | (pak_index >> 4)); 		}
-		      else if (algo == 5)  { pak.array()[index] = (byte) ((pak_index & 0xF0) | (pak_offset >> 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset << 4) | (pak_index & 0x0F)); 		}
-		      else if (algo == 6)  { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_index << 4))			;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset << 4) | (pak_index >> 4)); 			}
-		      else if (algo == 7)  { pak.array()[index] = (byte) ((pak_index & 0xF0) | (pak_offset >> 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0x0F) | (pak_index << 4)); 		}
-		      else if (algo == 8)  { pak.array()[index] = (byte) ((pak_offset & 0x0F) | (pak_index << 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index & 0xF0) | (pak_offset >> 4)); 		}
-		      else if (algo == 9)  { pak.array()[index] = (byte) ((pak_offset & 0xF0) | (pak_index >> 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0x0F) | (pak_index << 4)); 		}
-		      else if (algo == 10) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index & 0x0F))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0xF0) | (pak_index >> 4)); 		}
-		      else if (algo == 11) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index >> 4))			;	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset); }
-		      else if (algo == 12) { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_offset << 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index >> 4) | (pak_index << 4)); 			}
-		      else if (algo == 13) { pak.array()[index] = (byte) pak_offset										;	pak.array()[crypto.offsets[index]] = (byte) pak_index; 										}
-		      else if (algo == 14) { pak.array()[index] = (byte) ((pak_offset & 0xF0) | (pak_index >> 4))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset << 4) | (pak_index & 0x0F)); 		}
-		      else if (algo == 15) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset)	; 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	}
-		      else if (algo == 16) { pak.array()[index] = (byte) pak_offset										;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index >> 4) | (pak_index << 4)); 			}
-		      else if (algo == 17) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index & 0x0F))		;	pak.array()[crypto.offsets[index]] = (byte) ((pak_index & 0xF0) | (pak_offset >> 4)); 		}
-		      else if (algo == 18) { pak.array()[index] = (byte) ((pak_offset << 4) | (pak_index >> 4))			;	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset >> 4) | (pak_index << 4)); 			}
-		      else if (algo == 19) { pak.array()[index] = (byte) ((pak_offset >> 4) | (pak_offset << 4))		;	pak.array()[crypto.offsets[index]] = (byte) pak_index; 										}
-		      else if (algo == 20) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset)	; 	pak.array()[crypto.offsets[index]] = (byte) ((pak_offset << 4) | (pak_index >> 4)); 			}
+			//if(isTest)System.out.println("PAKINDEX "+HexString.from(pak_index));
+			//if(isTest)System.out.println("PAKOFFSET "+HexString.from(pak_offset));
+			if 	  	(algo == 0)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset)	;}
+		    else if (algo == 1)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index); 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))				;}
+		    else if (algo == 2)  { pak.array()[index] = (byte) (((pak_index >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) & 0xF0))				;}
+		    else if (algo == 3)  { pak.array()[index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)		;}
+		    else if (algo == 4)  { pak.array()[index] = (byte) ((pak_offset & 0x0F) | ((pak_index << 4) & 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0xF0) | ((pak_index >>> 4) & 0x0F))			;}
+		    else if (algo == 5)  { pak.array()[index] = (byte) ((pak_index & 0xF0) | ((pak_offset >>> 4) & 0x0F))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset << 4) & 0xF0) | (pak_index & 0x0F))			;}
+		    else if (algo == 6)  { pak.array()[index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4)& 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset << 4) & 0xF0) | ((pak_index >>> 4) & 0x0F))				;}
+		    else if (algo == 7)  { pak.array()[index] = (byte) ((pak_index & 0xF0) | (((pak_offset >>> 4) & 0x0F)))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0x0F) | ((pak_index << 4) & 0xF0))			;}
+		    else if (algo == 8)  { pak.array()[index] = (byte) ((pak_offset & 0x0F) | ((pak_index << 4) & 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_index & 0xF0) | ((pak_offset >>> 4) & 0x0F))			;}
+		    else if (algo == 9)  { pak.array()[index] = (byte) ((pak_offset & 0xF0) | (((pak_index >>> 4) & 0x0F)))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0x0F) | ((pak_index << 4) & 0xF0))			;}
+		    else if (algo == 10) { pak.array()[index] = (byte) (((pak_offset << 4) & 0xF0)| (pak_index & 0x0F))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_offset & 0xF0) | ((pak_index >>> 4) & 0x0F))			;}
+		    else if (algo == 11) { pak.array()[index] = (byte) (((pak_offset << 4) & 0xF0)| (((pak_index >>> 4) & 0x0F)))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset)	;}
+		    else if (algo == 12) { pak.array()[index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) &0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_index >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))				;}
+		    else if (algo == 13) { pak.array()[index] = (byte) pak_offset									  ;		pak.array()[crypto.offsets[index]] = (byte) pak_index											;}
+		    else if (algo == 14) { pak.array()[index] = (byte) ((pak_offset & 0xF0) | (((pak_index >>> 4) & 0x0F)))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset << 4) & 0xF0) | (pak_index & 0x0F))			;}
+		    else if (algo == 15) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset) ; 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)		;}
+		    else if (algo == 16) { pak.array()[index] = (byte) pak_offset									  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_index >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))				;}
+		    else if (algo == 17) { pak.array()[index] = (byte) (((pak_offset << 4) & 0xF0) | (pak_index & 0x0F))		  ;		pak.array()[crypto.offsets[index]] = (byte) ((pak_index & 0xF0) | ((pak_offset >>> 4) & 0x0F))			;}
+		    else if (algo == 18) { pak.array()[index] = (byte) (((pak_offset << 4) &0xF0) | (((pak_index >>> 4) & 0x0F)))		  ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))				;}
+		    else if (algo == 19) { pak.array()[index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) & 0xF0))		  ;		pak.array()[crypto.offsets[index]] = (byte) pak_index											;}
+		    else if (algo == 20) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset) ; 	pak.array()[crypto.offsets[index]] = (byte) (((pak_offset << 4) & 0xF0) | ((pak_index >>> 4) & 0x0F))				;}
+			//if(isTest)System.out.println("["+algo+"]PAK("+index+") "+HexString.from(pak.array()[index]));
+			//if(isTest)System.out.println("["+algo+"]PAK("+crypto.offsets[index]+") "+HexString.from(pak.array()[crypto.offsets[index]]));
 		}
 		// and finally, quadruple-XOR the data out
 		for (index=pak.array().length-1 ; index>=0; index--) {
 			if (index <= pak.array().length-4) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x000000FF); // we can XOR 4 bytes in a row
+				//if(isTest)System.out.println("PAXOR("+index+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0x0000FF00) >> 8;
+				//if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 				pak.array()[index + 2] ^= (crypto.xor[index] & 0x00FF0000) >> 16;
+				//if(isTest)System.out.println("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
 				pak.array()[index + 3] ^= (crypto.xor[index] & 0xFF000000) >> 24;
+				//if(isTest)System.out.println("PAXOR("+(index+3)+") "+HexString.from(pak.array()[index+3]));
 			}
 			else if (index == pak.array().length-3) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x0000FF); // we can XOR 3 bytes in a row
+				//if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0x00FF00) >> 8;
+				//if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 				pak.array()[index + 2] ^= (crypto.xor[index] & 0xFF0000) >> 16;
+				//if(isTest)System.out.println("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
 			}
 			else if (index == pak.array().length-2) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x00FF); // we can XOR 2 bytes in a row
+				//if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0xFF00) >> 8;
+				//if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 			}
 			else if (index == pak.array().length-1){
 				pak.array()[index] ^= (crypto.xor[index] & 0xFF); // end of stream
+				//if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 			}
 		}
 		// in the 1.50 protocol, the checksum info is at the trailing end of the pak.
-		short checksum = (short) ((pak.array()[pak.array().length - 2]<< 8) | (pak.array()[pak.array().length-1])); // so get it from there...
+		short checksum = (short) ((((short)pak.array()[pak.array().length - 1])<< 8) & 0xFF00 | (pak.array()[pak.array().length-2]) & 0xFF); // so get it from there...
 		pak.rewind();
+		valid = checksum_150(checksum);
+		//if(isTest)System.out.println("CHECKSUM "+HexString.from(checksum));
 		type = pak.getShort();
-		pak.limit(pak.limit()-2);
-		valid = checksum_150(pak, checksum);
+		//if(isTest)System.out.println("TYPE "+HexString.from(type));
 		pak.rewind();
-		pak.compact();
-		pak.rewind();
+		//if(isTest)System.out.println("PAK "+HexString.from(pak.array()));
 	}
 	
 	/**
 	 * checks if we decrypted data correctly
-	 * @param decrypted
 	 * @param checksum
 	 * @return
 	 */
-	private boolean checksum_150 (ByteBuffer decrypted, short checksum)
+	private boolean checksum_150 (short checksum)
 	{
-	   // this function computes and returns the pak data's checksum
-	   int index;
-	   short sum;
-	   sum = 0; // start at zero
+		// this function computes and returns the pak data's checksum
+		int index;
+		short sum;
+	   	sum = 0; // start at zero
 
-	   // for each byte of data...
-	   for (index = 0; index < pak.array().length; index++){
-	      sum += (byte) (pak.array()[index]); // add its inverse value to the checksum
-	   }
-	   if(sum == checksum)return true;
-	   System.err.println("BAD CHeCKSUM : "+sum+"!="+checksum);
-	   return false;
+		// for each byte of data...
+		for (index = 0; index < pak.array().length-2; index++){
+			sum += (~(pak.array()[index]) & 0xFF); // add its inverse value to the checksum
+			//if(isTest)System.out.println("CHECK("+index+") "+HexString.from(sum));
+		}
+		if(sum == checksum)return true;
+		//System.err.println("BAD CHECKSUM : "+HexString.from(sum)+"!= "+HexString.from(checksum));
+		return false;
 	}
 
 	/**
