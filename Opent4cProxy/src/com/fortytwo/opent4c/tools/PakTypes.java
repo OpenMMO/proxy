@@ -1,93 +1,265 @@
 package com.fortytwo.opent4c.tools;
 
+import java.nio.ByteBuffer;
+
 public class PakTypes {
 
-	public static String getServerType(int type) {
-		return ""+type;
+	public static String getTypeInfos(boolean isServerToClient, short type, ByteBuffer pak) {
+		if(isServerToClient)return getServerTypeInfos(type, pak);
+		return getClientTypeInfos(type, pak);
 	}
 	
-	public static String getClientType(int type) {
-		return ""+type;
+	public static String getClientTypeInfos(short type, ByteBuffer pak) {
+		StringBuilder sb = new StringBuilder();
+		
+		switch(type){
+		case 0x0001 : sb.append("PAK_CLIENT_PlayerMove_N 0x0001 // player character wants to move north");
+		break;
+		case 0x0002 : sb.append("PAK_CLIENT_PlayerMove_NE 0x0002");
+		break;
+		case 0x0003 : sb.append("PAK_CLIENT_PlayerMove_E 0x0003 // player character wants to move east");
+		break;
+		case 0x0004 : sb.append("PAK_CLIENT_PlayerMove_SE 0x0004");
+		break;
+		case 0x0005 : sb.append("PAK_CLIENT_PlayerMove_S 0x0005 // player character wants to move south");
+		break;
+		case 0x0006 : sb.append("PAK_CLIENT_PlayerMove_SW 0x0006");
+		break;
+		case 0x0007 : sb.append("PAK_CLIENT_PlayerMove_W 0x0007 // player character wants to move west");
+		break;
+		case 0x0008 : sb.append("PAK_CLIENT_PlayerMove_NW 0x0008");
+		break;
+		case 0x0009 : sb.append("PAK_CLIENT_PlayerMove_Stop 0x0009 // player character stopped moving");
+		break;
+		case 0x000A : sb.append("PAK_CLIENT_KeepAlive 0x000A // Pong");
+		break;
+		case 0x000B : sb.append("PAK_CLIENT_GetObject 0x000B"+System.lineSeparator()+
+				"   2   int16 x_coord; // object's X coordinate on map"+System.lineSeparator()+
+				"   4   int16 y_coord; // object's Y coordinate on map"+System.lineSeparator()+
+				"   6   int32 object_id; // object unit ID");
+		break;
+		case 0x000C : sb.append("PAK_CLIENT_DepositObject 0x000C"+System.lineSeparator()+
+				"   2   int16 x_coord; // object's X coordinate on map"+System.lineSeparator()+
+				"   4   int16 y_coord; // object's Y coordinate on map"+System.lineSeparator()+
+				"   6   int32 object_id; // object unit ID"+System.lineSeparator()+
+				"   10   int32 item_count; // amount of same objects in this unit, if the objects are stacked");
+		break;
+		case 0x000D : sb.append("PAK_CLIENT_PutPlayerInGame 0x000D"+System.lineSeparator()+
+				"   2   string8 playername;");
+		break;
+		case 0x000E : sb.append("PAK_CLIENT_Login 0x000E"+System.lineSeparator()+
+				"   2   string8 login;"+System.lineSeparator()+
+				"   2+[1+S]   string8 password;"+System.lineSeparator()+
+				"   2+[1+S]+[1+S]+2   int16 client_version_number;"+System.lineSeparator()+
+				"   2+[1+S]+[1+S]+4   int16 unknown;");
+		break;
+		case 0x000F : sb.append("");
+		break;
+		case 0x0010 : sb.append("");
+		break;
+		case 0x0011 : sb.append("");
+		break;
+		case 0x0012 : sb.append("");
+		break;
+		case 0x0013 : sb.append("");
+		break;
+		case 0x0014 : sb.append("");
+		break;
+		case 0x0015 : sb.append("");
+		break;
+		case 0x0016 : sb.append("");
+		break;
+		case 0x0017 : sb.append("");
+		break;
+		case 0x0018 : sb.append("");
+		break;
+		case 0x0019 : sb.append("");
+		break;
+		case 0x001A : sb.append("");
+		break;
+		case 0x001B : sb.append("");
+		break;
+		case 0x001C : sb.append("");
+		break;
+		case 0x001D : sb.append("");
+		break;
+		case 0x001E : sb.append("");
+		break;
+		case 0x001F : sb.append("");
+		break;
+		case 0x0020 : sb.append("");
+		break;
+		case 0x0021 : sb.append("");
+		break;
+		case 0x0022 : sb.append("");
+		break;
+		case 0x0023 : sb.append("");
+		break;
+		case 0x0024 : sb.append("");
+		break;
+		case 0x0025 : sb.append("");
+		break;
+		case 0x0042 : sb.append("PAK_CLIENT_MessageOfTheDay 0x0042");
+		break;
+	
+		}
+		sb.append(System.lineSeparator());
+		
+		return sb.toString();
+	}
+	
+	public static String getServerTypeInfos(short type, ByteBuffer pak) {
+		StringBuilder sb = new StringBuilder();
+		
+		switch(type){
+		case 0x0001 : sb.append("PAK_SERVER_UpdateCoordinates 0x0001 // a unit is moving on screen"+System.lineSeparator()+
+				"	2   int16 x_coord; // new X coordinate on map"+System.lineSeparator()+
+				"	4   int16 y_coord; // new Y coordinate on map"+System.lineSeparator()+
+				"	6   int16 skin_id; // unit skin ID"+System.lineSeparator()+
+				"	8   int32 unit_id; // unit ID"+System.lineSeparator()+
+				"	12   int8 light_percentage; // radiance from 0 to 100"+System.lineSeparator()+
+				"	13   int8 unit_type; // 0 = monster, 1 = NPC, 2 = player"+System.lineSeparator()+
+				"	14   int8 health_percentage; // visual health from red (0) to green (100)");
+		break;
+		case 0x0002 : sb.append("N/A");
+		break;
+		case 0x0003 : sb.append("N/A");
+		break;
+		case 0x0004 : sb.append("N/A");
+		break;
+		case 0x0005 : sb.append("N/A");
+		break;
+		case 0x0006 : sb.append("N/A");
+		break;
+		case 0x0007 : sb.append("N/A");
+		break;
+		case 0x0008 : sb.append("N/A");
+		break;
+		case 0x0009 : sb.append("PAK_SERVER_SynchronizePlayerCoordinates 0x0009 // server is making sure client is at the right location"+System.lineSeparator()+
+				"   2   int16 x_coord;"+System.lineSeparator()+
+				"   4   int16 y_coord;"+System.lineSeparator()+
+				"   6   int16 world;");
+		break;
+		case 0x000A : sb.append("PAK_SERVER_KeepAlive 0x000A // Ping");
+		break;
+		case 0x000B : sb.append("N/A");
+		break;
+		case 0x000C : sb.append("N/A");
+		break;
+		case 0x000D : sb.append("PAK_SERVER_PutPlayerInGame 0x000D"+System.lineSeparator()+
+				"   2   int8 unknown1;"+System.lineSeparator()+
+				"   3   int32 player_id;"+System.lineSeparator()+
+				"   7   int16 x_coord;"+System.lineSeparator()+
+				"   9   int16 y_coord;"+System.lineSeparator()+
+				"   11   int16 world;"+System.lineSeparator()+
+				"   13   int32 health;"+System.lineSeparator()+
+				"   17   int32 max_health;"+System.lineSeparator()+
+				"   21   int16 mana;"+System.lineSeparator()+
+				"   23   int16 max_mana;"+System.lineSeparator()+
+				"   25   int64 xp;"+System.lineSeparator()+
+				"   33   int64 next_level_xp;"+System.lineSeparator()+
+				"   41   int16 strength;"+System.lineSeparator()+
+				"   43   int16 endurance;"+System.lineSeparator()+
+				"   45   int16 dexterity;"+System.lineSeparator()+
+				"   47   int16 willpower; // unused"+System.lineSeparator()+
+				"   49   int16 wisdom;"+System.lineSeparator()+
+				"   51   int16 intelligence;"+System.lineSeparator()+
+				"   53   int16 luck; // unused"+System.lineSeparator()+
+				"   55   int8 seconds;"+System.lineSeparator()+
+				"   56   int8 minutes;"+System.lineSeparator()+
+				"   57   int8 hour;"+System.lineSeparator()+
+				"   58   int8 week;"+System.lineSeparator()+
+				"   59   int8 day;"+System.lineSeparator()+
+				"   60   int8 month;"+System.lineSeparator()+
+				"   61   int16 year;"+System.lineSeparator()+
+				"   63   int32 gold;"+System.lineSeparator()+
+				"   67   int16 level;"+System.lineSeparator()+
+				"   69   int64 base_level_xp;");
+		break;
+		case 0x000E : sb.append("PAK_SERVER_Login 0x000E"+System.lineSeparator()+
+				"   2    int8 status; // 0 = welcome, 1 = can't login, 2 = already logged in"+System.lineSeparator()+
+				"   3    string16 message;");
+		break;
+		case 0x000F : sb.append("");
+		break;
+		case 0x0010 : sb.append("");
+		break;
+		case 0x0011 : sb.append("");
+		break;
+		case 0x0012 : sb.append("");
+		break;
+		case 0x0013 : sb.append("");
+		break;
+		case 0x0014 : sb.append("");
+		break;
+		case 0x0015 : sb.append("");
+		break;
+		case 0x0016 : sb.append("");
+		break;
+		case 0x0017 : sb.append("");
+		break;
+		case 0x0018 : sb.append("");
+		break;
+		case 0x0019 : sb.append("");
+		break;
+		case 0x001A : sb.append("");
+		break;
+		case 0x001B : sb.append("");
+		break;
+		case 0x001C : sb.append("");
+		break;
+		case 0x001D : sb.append("");
+		break;
+		case 0x001E : sb.append("");
+		break;
+		case 0x001F : sb.append("");
+		break;
+		case 0x0020 : sb.append("");
+		break;
+		case 0x0021 : sb.append("");
+		break;
+		case 0x0022 : sb.append("");
+		break;
+		case 0x0023 : sb.append("");
+		break;
+		case 0x0024 : sb.append("");
+		break;
+		case 0x0025 : sb.append("");
+		break;
+		case 0x0026 : sb.append("");
+		break;
+		case 0x0042 : sb.append("PAK_SERVER_MessageOfTheDay 0x0042"+System.lineSeparator()+
+				"   2   string16 MOTD size : ");
+		pak.rewind();
+		pak.getShort();
+		short size = pak.getShort();
+		sb.append(size);
+		sb.append(System.lineSeparator());
+		sb.append("MOTD : ");
+		byte[] motd = new byte[size];
+		pak.get(motd,0,size);
+		sb.append(new String(motd));
+		sb.append(System.lineSeparator());
+		break;
+		}
+		sb.append(System.lineSeparator());
+		
+		return sb.toString();
 	}
 /**
-#define PAK_CLIENT_PlayerMove_N 0x0001 // player character wants to move north
-#define PAK_CLIENT_PlayerMove_NE 0x0002
-#define PAK_CLIENT_PlayerMove_E 0x0003 // player character wants to move east
-#define PAK_CLIENT_PlayerMove_SE 0x0004
-#define PAK_CLIENT_PlayerMove_S 0x0005 // player character wants to move south
-#define PAK_CLIENT_PlayerMove_SW 0x0006
-#define PAK_CLIENT_PlayerMove_W 0x0007 // player character wants to move west
-#define PAK_CLIENT_PlayerMove_NW 0x0008
-#define PAK_CLIENT_PlayerMove_Stop 0x0009 // player character stopped moving
 
-#define PAK_SERVER_UpdateCoordinates 0x0001 // a unit is moving on screen
-//   2   int16 x_coord; // new X coordinate on map
-//   4   int16 y_coord; // new Y coordinate on map
-//   6   int16 skin_id; // unit skin ID
-//   8   int32 unit_id; // unit ID
-//   12   int8 light_percentage; // radiance from 0 to 100
-//   13   int8 unit_type; // 0 = monster, 1 = NPC, 2 = player
-//   14   int8 health_percentage; // visual health from red (0) to green (100)
+#define 
+#define 
 
-#define PAK_SERVER_SynchronizePlayerCoordinates 0x0009 // server is making sure client is at the right location
-//   2   int16 x_coord;
-//   4   int16 y_coord;
-//   6   int16 world;
+#define 
 
-#define PAK_CLIENT_KeepAlive 0x000A // Pong
-#define PAK_SERVER_KeepAlive 0x000A // Ping
+#define 
 
-#define PAK_CLIENT_GetObject 0x000B
-//   2   int16 x_coord; // object's X coordinate on map
-//   4   int16 y_coord; // object's Y coordinate on map
-//   6   int32 object_id; // object unit ID
+#define 
+#define 
 
-#define PAK_CLIENT_DepositObject 0x000C
-//   2   int16 x_coord; // object's X coordinate on map
-//   4   int16 y_coord; // object's Y coordinate on map
-//   6   int32 object_id; // object unit ID
-//   10   int32 item_count; // amount of same objects in this unit, if the objects are stacked
-
-#define PAK_CLIENT_PutPlayerInGame 0x000D
-//   2   string8 playername;
-#define PAK_SERVER_PutPlayerInGame 0x000D
-//   2   int8 unknown1;
-//   3   int32 player_id;
-//   7   int16 x_coord;
-//   9   int16 y_coord;
-//   11   int16 world;
-//   13   int32 health;
-//   17   int32 max_health;
-//   21   int16 mana;
-//   23   int16 max_mana;
-//   25   int64 xp;
-//   33   int64 next_level_xp;
-//   41   int16 strength;
-//   43   int16 endurance;
-//   45   int16 dexterity;
-//   47   int16 willpower; // unused
-//   49   int16 wisdom;
-//   51   int16 intelligence;
-//   53   int16 luck; // unused
-//   55   int8 seconds;
-//   56   int8 minutes;
-//   57   int8 hour;
-//   58   int8 week;
-//   59   int8 day;
-//   60   int8 month;
-//   61   int16 year;
-//   63   int32 gold;
-//   67   int16 level;
-//   69   int64 base_level_xp;
-
-#define PAK_CLIENT_Login 0x000E
-//   2   string8 login;
-//   2+[1+S]   string8 password;
-//   2+[1+S]+[1+S]+2   int16 client_version_number;
-//   2+[1+S]+[1+S]+4   int16 unknown;
-#define PAK_SERVER_Login 0x000E
-//   2    int8 status; // 0 = welcome, 1 = can't login, 2 = already logged in
-//   3    string16 message;
+#define 
+#define 
 
 #define PAK_CLIENT_DeletePlayer 0x000F
 //   2   string8 playername;
@@ -670,9 +842,8 @@ public class PakTypes {
 //      string16 address;
 //   }
 
-#define PAK_CLIENT_MessageOfTheDay 0x0042
-#define PAK_SERVER_MessageOfTheDay 0x0042
-//   2   string16 message;
+#define 
+#define 
 
 #define PAK_CLIENT_Unknown67 0x0043
 #define PAK_SERVER_UpdateMana 0x0043
@@ -1090,4 +1261,6 @@ Pak pour les clients NMS uniquement
 #define	PAK_SERVER_DeathResurection 0x00CA
 
  */
+
+
 }
