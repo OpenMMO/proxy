@@ -29,10 +29,6 @@ public class Proxy {
 	private static Runnable clientTunnel;
 	
 	public static void main(String[] args) throws IOException {
-		/*MSRand rnd = new MSRand(0x11223344);
-		for (int i = 0 ; i<100 ; i++){
-			System.out.println(rnd.prng());
-		}*/
 		//Pak150.test();
 		while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
@@ -42,7 +38,6 @@ public class Proxy {
 		createSockets();
 		startSendPiles();
 		openTunnels();
-		//Sniffer.main(null);
 	}
 
 	/**

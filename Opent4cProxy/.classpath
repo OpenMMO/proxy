@@ -2,11 +2,5 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
-	<classpathentry kind="lib" path="lib/jnetpcap-1.4.r1425/jnetpcap.jar" sourcepath="lib/jnetpcap-1.4.r1425/jnetpcap-src-1.4.r1425-1.zip">
-		<attributes>
-			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/jnetpcap-1.4.r1425/jnetpcap-javadoc-1.4.r1425-1.zip!/jnetpcap-javadoc-1.4.r1425-1"/>
-			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="Opent4cProxy/lib/jnetpcap-1.4.r1425"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

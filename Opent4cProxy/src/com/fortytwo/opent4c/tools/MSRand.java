@@ -26,4 +26,9 @@ public class MSRand {
 		next = (next * 0x343fd) + 0x269ec3;
 		return (int) ((next>>16) & 0x7fff);
 	}
+	
+	public static int lrand(){
+		MSRand rnd = new MSRand((int) System.currentTimeMillis());
+		return rnd.prng();
+	}
 }
