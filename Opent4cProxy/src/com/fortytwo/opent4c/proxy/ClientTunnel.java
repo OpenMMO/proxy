@@ -8,7 +8,11 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+
+import com.fortytwo.opent4c.tools.HexString;
+import com.fortytwo.opent4c.tools.Log;
 
 /**
  * Manages client<->proxy connection.
@@ -22,21 +26,27 @@ import java.util.List;
  *
  */
 public class ClientTunnel {
-	//TODO have to instantiate ClientTunnel to manage more than 1 client at a time
 	private static boolean online = true;
-	public static int port = -1;
-	public static InetAddress ip;
-	private static List<DatagramPacket> sendpile = Collections.synchronizedList(new ArrayList<DatagramPacket>());
+	public int port = -1;
+	public InetAddress ip;
+	public static List<ClientTunnel> clients = Collections.synchronizedList(new ArrayList<ClientTunnel>());
+	public static List<DatagramPacket> sendpile = Collections.synchronizedList(new ArrayList<DatagramPacket>());
 	private static DatagramSocket fromClientSocket;
 	
-	public ClientTunnel() {}
+	public ClientTunnel(InetAddress ip, int port) {
+		this.port = port;
+		this.ip = ip;
+		clients.add(this);
+		Log.client.fatal("New client : "+ip.toString()+":"+port);
+	}
 
 	/**
 	 * Adds a message to send pile
 	 * @param packet
 	 */
-	public static void pile(DatagramPacket packet) {
+	public void pile(DatagramPacket packet) {
 		sendpile.add(packet);
+		Log.client.fatal("Message to client added to pile ("+sendpile.size()+")");
 	}
 	
 	/**
@@ -45,6 +55,7 @@ public class ClientTunnel {
 	 * @throws IOException 
 	 */
 	public static void startSendPile() throws InterruptedException, IOException {
+		Log.client.fatal("Client send pile ready");
 		while(online){
 			while(sendpile.size() != 0){
 				send(sendpile.get(0));
@@ -60,7 +71,8 @@ public class ClientTunnel {
 	 * @throws IOException 
 	 */
 	private static void send(DatagramPacket packet) throws IOException {
-		ClientTunnel.fromClientSocket.send(packet);
+		fromClientSocket.send(packet);
+		Log.client.fatal("Message to client sent");
 	}
 
 	/**
@@ -75,24 +87,49 @@ public class ClientTunnel {
 		long micros;
 		long stamp;
 		ByteBuffer sendData = null;
+		Log.client.fatal("Listening for client messages");
 		while(online){
 			receiveData = new byte[1024];
 			receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			fromClientSocket.receive(receivePacket);
 			micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
 			stamp = System.currentTimeMillis();
-			port = receivePacket.getPort();
-			ip = receivePacket.getAddress();
+			int port = receivePacket.getPort();
+			InetAddress ip = receivePacket.getAddress();
+			if(!isKnownClient(port)){
+				new ClientTunnel(ip, port);
+			}
 			if (Proxy.clientVersion == 150){
 				Pak150 decrypted = new Pak150(receivePacket, false, stamp, micros);
-				sendData = decrypted.getSendData();
+				Pak150 encrypted = new Pak150(decrypted.getType(), false, decrypted.getData());
+				//Log.client.fatal(HexString.from(encrypted.getData()));
+				DatagramPacket sendPacket = new DatagramPacket(encrypted.getData(), encrypted.getData().length, Proxy.serverAddress, Proxy.serverPort);
+				new Pak150(sendPacket, false, stamp, micros);
+				//ServerTunnel.pile(sendPacket);
+				//sendData = decrypted.getSendData();
 			}else if (Proxy.clientVersion == 125){
 				Pak125 decrypted = new Pak125(receivePacket, false, stamp, micros);
 				sendData = decrypted.getSendData();
 			}
-			DatagramPacket sendPacket = new DatagramPacket(sendData.array(), sendData.array().length, Proxy.serverAddress, Proxy.serverPort);
-			ServerTunnel.pile(sendPacket);
+			//DatagramPacket sendPacket = new DatagramPacket(receiveData, receiveData.length, Proxy.serverAddress, Proxy.serverPort);
+//			DatagramPacket sendPacket = new DatagramPacket(sendData.array(), sendData.array().length, Proxy.serverAddress, Proxy.serverPort);
+			//ServerTunnel.pile(sendPacket);
 		}
+	}
+
+	/**
+	 * Tells if a client is already known
+	 * @param ip
+	 * @param port
+	 * @return
+	 */
+	private static boolean isKnownClient(int port) {
+		Iterator<ClientTunnel> it = clients.iterator();
+		while(it.hasNext()){
+			ClientTunnel c = it.next();
+			if(c.port == port) return true;
+		}
+		return false;
 	}
 
 	/**
@@ -102,5 +139,15 @@ public class ClientTunnel {
 	 */
 	public static void createSocket(int proxyPort) throws SocketException {
 		fromClientSocket = new DatagramSocket(proxyPort);
+		Log.client.fatal("Client Socket created");
+	}
+
+	public static ClientTunnel getByPort(int port) {
+		Iterator<ClientTunnel> it = clients.iterator();
+		while(it.hasNext()){
+			ClientTunnel c = it.next();
+			if(c.port == port) return c;
+		}
+		return null;
 	}
 }

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-//to execute test : gcc netcode150.c -o test && ./test && rm test
+//to execute test : gcc netcode150_decrypt.c -o test && ./test && rm test
 int main (void)
 {
    // the 1.50 protocol cryptography uses extensively the standard C random number generator,
@@ -16,13 +16,13 @@ int main (void)
    int index;
    unsigned int algo;
    signed short checksum;
-   unsigned long seed = 0x00D80786;
+   unsigned long seed = 0x00642900;
    unsigned long next;
    unsigned int data_size = 4;
    unsigned int xor[4];
    unsigned int offsets[4];
    unsigned int algos[4];
-   unsigned char data[] = {0xB9, 0x27, 0x5B, 0xB3};
+   unsigned char data[] = {0x75, 0x57, 0x28, 0x0F};
    signed short sum;
 
 
@@ -37,17 +37,23 @@ int main (void)
  		return ((next>>16) & 0x7fff);
  	}
 
- 	void check(void)
+ 	signed short check(void)
  	{
  	   // this function computes and returns the pak data's checksum
  	   sum = 0; // start at zero
  	   // for each byte of data...
  	   for (index = 0; index < data_size-2; index++){
  	      sum += (unsigned char) (~data[index]); // add its inverse value to the checksum
- 	      printf("CHECK(%d) %X\n",index + 0, sum);
+ 	      //printf("CHECK(%d) %X\n",index + 0, sum);
  	   }
+ 	   return sum;
  	}
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////   
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	printf("SOURCE\n");
  	//printf("SHIFTED SEED %X\n",  (int) (((unsigned char *) &seed)[3] << 24)
     //      | (int) (((unsigned char *) &seed)[0] << 16)
     //      | (int) (((unsigned char *) &seed)[2] << 8)
@@ -58,6 +64,7 @@ int main (void)
           | (int) (((unsigned char *) &seed)[0] << 16)
           | (int) (((unsigned char *) &seed)[2] << 8)
           | (int) (((unsigned char *) &seed)[1]));
+	printf("SEED %X\n",seed);
 
    // now generate the crypto tables for the given datagram length
 
@@ -122,8 +129,8 @@ int main (void)
       else if (algo == 18) { *edi = (a << 4) | (c >> 4);   *ebp = (a >> 4) | (c << 4);   }
       else if (algo == 19) { *edi = (a >> 4) | (a << 4);   *ebp = c;                     }
       else if (algo == 20) { *edi = ((a ^ c) & 0x0F) ^ a;  *ebp = (a << 4) | (c >> 4);   }
-      printf("[%d]PAK(%d) %X\n",algo,index, *edi);
-      printf("[%d]PAK(%d) %X\n",algo, offsets[index], *ebp);
+      //printf("[%d]PAK(%d) %X\n",algo,index, *edi);
+      //printf("[%d]PAK(%d) %X\n",algo, offsets[index], *ebp);
       
    }
 
@@ -161,10 +168,11 @@ int main (void)
          data[index] ^= (xor[index] & 0xFF); // end of stream
          //printf("PAXOR(%d) %X\n",index + 0, data[index + 0]);
    }
+   	printf("DECRYPTED DATA %X, %X, %X, %X\n", data[0], data[1], data[2], data[3]);
    check();
    checksum = ((unsigned short)(data[data_size-1]<<8)&0xFF00)|((unsigned short)(data[data_size-2])&0xFF);
-   printf("CHECKSUM %X\n",checksum);
-   printf("TYPE %X %X\n",data[0],data[1]);
+   //printf("CHECKSUM %X\n",checksum);
+   //printf("TYPE %X %X\n",data[0],data[1]);
    
 	//printf("MOTD LENGTH %d\nMOTD : ",(((int)(data[2]<<8)&0xFF00)|(int)(data[3])&0xFF));
 	//for (index = 4 ; index < data_size-2 ; index ++){
@@ -172,5 +180,7 @@ int main (void)
 	//}
    //printf("\n");
    // finished, pak is decrypted
-   return;
+   
+
+   return 0;
 }

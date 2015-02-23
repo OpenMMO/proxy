@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.fortytwo.opent4c.tools.Log;
+
 /**
  * Manages proxy<->server connection.
  * We have a thread looking periodically to a thread-safe list's size.
@@ -21,7 +23,7 @@ import java.util.List;
  *
  */
 public class ServerTunnel {
-	private static List<DatagramPacket> sendpile = Collections.synchronizedList(new ArrayList<DatagramPacket>());
+	public static List<DatagramPacket> sendpile = Collections.synchronizedList(new ArrayList<DatagramPacket>());
 	private static boolean online = true;
 	private static DatagramSocket toServerSocket;
 	
@@ -33,6 +35,7 @@ public class ServerTunnel {
 	 */
 	public static void pile(DatagramPacket packet) {
 		sendpile.add(packet);
+		Log.server.fatal("Message to added to pile ("+sendpile.size()+")");
 	}
 
 	/**
@@ -41,6 +44,7 @@ public class ServerTunnel {
 	 * @throws IOException 
 	 */
 	public static void startSendPile() throws InterruptedException, IOException {
+		Log.server.fatal("Server send pile ready");
 		while(online){
 			while(sendpile.size() != 0){
 				send(sendpile.get(0));
@@ -57,6 +61,7 @@ public class ServerTunnel {
 	 */
 	private static void send(DatagramPacket packet) throws IOException {
 		ServerTunnel.toServerSocket.send(packet);
+		Log.server.fatal("Message to server sent");
 	}
 
 	/**
@@ -71,12 +76,16 @@ public class ServerTunnel {
 		long micros;
 		long stamp;
 		ByteBuffer sendData = null;
+		Log.server.fatal("Listening for server messages");
 		while(online){
 			receiveData = new byte[1024];
 			receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			toServerSocket.receive(receivePacket);
 			micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
 			stamp = System.currentTimeMillis();
+			int port = receivePacket.getPort();
+			Log.server.fatal("Incoming message");
+			ClientTunnel c = ClientTunnel.getByPort(port);
 			if (Proxy.serverVersion == 150){
 				Pak150 decrypted = new Pak150(receivePacket, true, stamp, micros);
 				sendData = decrypted.getSendData();
@@ -84,8 +93,8 @@ public class ServerTunnel {
 				Pak125 decrypted = new Pak125(receivePacket, true, stamp, micros);
 				sendData = decrypted.getSendData();
 			}
-			DatagramPacket sendPacket = new DatagramPacket(sendData.array(), sendData.array().length, ClientTunnel.ip, ClientTunnel.port);
-			ClientTunnel.pile(sendPacket);
+			DatagramPacket sendPacket = new DatagramPacket(sendData.array(), sendData.array().length, c.ip, c.port);
+			c.pile(sendPacket);
 		}
 	}
 	
@@ -95,5 +104,6 @@ public class ServerTunnel {
 	 */
 	public static void createSocket() throws SocketException {
 		toServerSocket = new DatagramSocket();
+		Log.server.fatal("Server Socket created");
 	}
 }

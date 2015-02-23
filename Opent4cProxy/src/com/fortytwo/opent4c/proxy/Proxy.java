@@ -1,5 +1,10 @@
 package com.fortytwo.opent4c.proxy;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -9,6 +14,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.Logger;
+
+import com.fortytwo.opent4c.bot.bot150;
+import com.fortytwo.opent4c.tools.CalendarUtils;
+import com.fortytwo.opent4c.tools.Log;
+
 /**
  * Proxy for translating T4C paks form version to version between client and server, and to translate T4C paks to and from openT4C paks.
  * @author syno
@@ -16,87 +28,119 @@ import java.util.concurrent.Executors;
  */
 public class Proxy {
 	public static long startTime;
-	public static int proxyPort = 11679;
-	public static int serverPort = 11677;//11677 is default server port, use T4C port patcher to modify T4C Server.exe
-	public static int clientVersion = 150;//0 for opent4c
-	public static int serverVersion = 150;//0 for opent4c
+	private static final String cfgFile = "res/proxy.cfg";
+	public static int max_clients;
+	public static int proxyPort;
+	public static int serverPort;
+	public static int clientVersion;
+	public static int serverVersion;
 	public static InetAddress serverAddress;
-	private static ExecutorService exService = Executors.newFixedThreadPool(4);
-	private static final String usage = "java -jar proxy.jar -p PROXYPORT -sp SERVERPORT -c CLIENTVERSION -s SERVERVERSION -ip SERVERADDRESS"+System.lineSeparator()+"ie : java -jar proxy.jar -p 11677 -sp 11678 -c 150 -s 150 -ip 127.0.0.1";
+	private static boolean bot;
+	private static ExecutorService exService = Executors.newFixedThreadPool(5);
 	private static Runnable clientSendPile;
 	private static Runnable serverSendPile;
 	private static Runnable serverTunnel;
 	private static Runnable clientTunnel;
+	private static Runnable botRunnable;
 	
 	public static void main(String[] args) throws IOException {
-		//Pak150.test();
+		Pak150 encrypted = new Pak150((short) 0x42, false, new byte[]{});
+		//Log.client.fatal(HexString.from(encrypted.getData()));
+		DatagramPacket sendPacket = new DatagramPacket(encrypted.getData(), encrypted.getData().length, Proxy.serverAddress, Proxy.serverPort);
+		new Pak150(sendPacket, false, 0, 0);
+		/*Log.initLogger();
+		if(args.length != 0){
+			Log.proxy.error("Program takes no arguments, see proxy.cfg file instead.");
+			System.exit(1);
+		}
 		while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
 		}
-		serverAddress = InetAddress.getByName("192.168.1.6");
-		parseArgs(args);
+		Log.proxy.fatal("fatal");
+		Log.proxy.error("error");
+		Log.proxy.warn("warn");
+		Log.proxy.info("info");
+		Log.proxy.debug("debug");
+		Log.proxy.trace("trace");
+
+		Log.proxy.fatal("Starting proxy");
+		readCfgFile(cfgFile);
 		createSockets();
 		startSendPiles();
 		openTunnels();
+		if(bot) createBot();*/
 	}
 
 	/**
-	 * parses program arguments or uses defaults
-	 * @param args
-	 * @throws UnknownHostException
-	 * @throws NumberFormatException
+	 * creates a bot depending on server version
 	 */
-	private static void parseArgs(String[] args) throws UnknownHostException, NumberFormatException {
-		Map<Integer,String> params = new HashMap<Integer,String>();
-		if(args.length != 0){
-			for (int i = 0 ; i < args.length ; i++){
-				params.put(i, args[i]);
-			}
-			Iterator<Integer> iter_param = params.keySet().iterator();
-			while(iter_param.hasNext()){
-				int key = iter_param.next();
-				String param = params.get(key);
-				if(iter_param.hasNext()){
-					key = iter_param.next();
-					String value = params.get(key);
-					if (param.equals("-p") || param.equals("--port")){
-						proxyPort = Integer.parseInt(value);
-					}else if (param.equals("-sp") || param.equals("--server-port")){
-						serverPort = Integer.parseInt(value);
-					}else if (param.equals("-c") || param.equals("--client-version")){
-						clientVersion = Integer.parseInt(value);
-					}else if (param.equals("-s") || param.equals("--server-version")){
-						serverVersion = Integer.parseInt(params.get(key+1));
-					}else if (param.equals("-ip") || param.equals("--server-address")){
-						serverAddress = InetAddress.getByName(value);
-					}else{
-						System.err.println("Unknown parameter : "+param);
-						System.err.println(usage);
-						System.exit(1);
-					}
-				}else{
-					System.err.println("Parameter needs a value : "+param);
-					System.err.println(usage);
-					System.exit(1);
+	private static void createBot() {
+		switch(serverVersion){
+		case 150 :
+			botRunnable = new Runnable(){
+				public void run(){
+					bot150.create();
 				}
-			}
+			};
+			exService.submit(botRunnable);
+		break;
 		}
-		System.out.println("Proxy port set to : "+proxyPort);
-		System.out.println("Server port set to : "+serverPort);
-		System.out.println("Client version set to : "+clientVersion);
-		System.out.println("Server version set to : "+serverVersion);
-		System.out.println("Server address set to : "+serverAddress);		
+	}
+
+	/**
+	 * Reads proxy parameters from proxy.cfg file
+	 * @param cfg 
+	 * @throws IOException 
+	 */
+	private static void readCfgFile(String cfg) throws IOException {
+		Log.proxy.fatal("Reading configuration file");
+		BufferedReader buff = null;
+		try {
+			buff = new BufferedReader(new FileReader(new File(cfg)));
+		} catch (FileNotFoundException e) {
+			Log.proxy.error("File proxy.cfg not found, please check and try again.");
+			System.exit(1);
+		}			 
+		String line;
+		while ((line = buff.readLine()) != null) {
+			readCfgLine(line);
+		}
+	}
+
+	/**
+	 * reads a line from config file escaping line starting with # or with //
+	 * @param line
+	 * @throws UnknownHostException 
+	 */
+	private static void readCfgLine(String line) throws UnknownHostException {
+		if(line.startsWith("#") || line.startsWith("//") || line.equalsIgnoreCase("")) return;
+		String[] params = line.split("=");
+		if(params.length != 2){
+			Log.proxy.error("Line should be PARAM=VALUE");
+			Log.proxy.error(line);
+			return;
+		}
+		if(params[0].equalsIgnoreCase("server address"))serverAddress = InetAddress.getByName(params[1]);
+		else if(params[0].equalsIgnoreCase("server version"))serverVersion = Integer.parseInt(params[1]);
+		else if(params[0].equalsIgnoreCase("server port"))serverPort = Integer.parseInt(params[1]);
+		else if(params[0].equalsIgnoreCase("client version"))clientVersion = Integer.parseInt(params[1]);
+		else if(params[0].equalsIgnoreCase("max clients"))max_clients = Integer.parseInt(params[1]);
+		else if(params[0].equalsIgnoreCase("proxy port"))proxyPort = Integer.parseInt(params[1]);
+		else if(params[0].equalsIgnoreCase("bot"))bot = Boolean.parseBoolean(params[1]);
+		else{
+			Log.proxy.fatal("Unknown parameter "+ line);
+			return;
+		}
+		Log.proxy.fatal(params[0]+" = "+params[1]);
 	}
 	
 	/**
 	 * Creates client and server sockets
-	 * we are server for client and client for server
+	 * we are server for clients and client for server
 	 * @throws SocketException
 	 */
 	private static void createSockets() throws SocketException {
-		System.out.println("Sending messages to server on port : "+serverPort);
 		ServerTunnel.createSocket();
-		System.out.println("Listening for client messages on port : "+proxyPort);
 		ClientTunnel.createSocket(proxyPort);		
 	}
 

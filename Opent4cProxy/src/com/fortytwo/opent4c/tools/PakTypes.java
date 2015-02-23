@@ -145,9 +145,7 @@ public class PakTypes {
 	 * @param pak
 	 * @return
 	 */
-	public static String getTypeInfos(boolean isServerToClient, ByteBuffer pak) {
-		pak.rewind();
-		short type = pak.getShort();
+	public static String getTypeInfos(short type, boolean isServerToClient, ByteBuffer pak) {
 		if(isServerToClient)return getServerTypeInfos(type, pak);
 		return getClientTypeInfos(type, pak);
 	}
