@@ -11,12 +11,22 @@ import com.fortytwo.opent4c.tools.Log;
 import com.fortytwo.opent4c.tools.MSRand;
 import com.fortytwo.opent4c.tools.PakTypes;
 
+/**
+ * This class manages all messages from v1.50 protocol. It can decrypt or encrypt any message.
+ * Messages formats are given by PakTypes.
+ * @author syno
+ *
+ */
 public class Pak150 {
+	public static final boolean CLIENT_TO_SERVER = false;
+	public static final boolean SERVER_TO_CLIENT = true;
+	public static final byte[] EMPTY = new byte[]{};
+	
 	private boolean isTest = false;//only used to print infos while decrypting, for testing purpose
 	private boolean isServerToClient = false;//direction of the pak
 	//private DatagramPacket packet;//not needed when everything will be working
-	private long timeStamp;//System.currentTimeMillis() just after we received the pak
-	private long micros;//((System.nanoTime()-Proxy.startTime)%1000000)/1000 just after we received the pak
+	private long timeStamp;//System.currentTimeMillis() just after we received/created the pak
+	private long micros;//((System.nanoTime()-Proxy.startTime)%1000000)/1000 just after we received/created the pak
 	//private ByteBuffer header = ByteBuffer.allocate(16);//will be filled with bytes 0 to 15 of received data
 	private byte fragmentID;//byte 0 of header, == 0 for non fragmented paks
 	private boolean isLastFragment = false;//if fragmentID != 0, this pak is the last of a fragmented message
@@ -32,71 +42,71 @@ public class Pak150 {
 	private ByteBuffer pak = null;//bytes 16 and following. it's first filled with crypted data and then with decrypted.
 	//private byte[] pak_crypt = null;//original data, not need when everyhing will be working
 	private short type;//byte 0 and 1 of decrypted data, we get it from pak after it's been decrypted.
-	private short checksum;
+	private short checksum;//last 2 bytes of pak. Checksum of pak, decrypted, a pak with wrong checksum has to be refused.
 	private boolean valid = false;//set to true if the checksum is valid after we've decrypted the data.
 
 	public static void test(){
-		Pak150 p = new Pak150(PakTypes.PAK_CLIENT_MessageOfTheDay, false, new byte[]{});
+		Pak150 p = new Pak150(PakTypes.PAK_CLIENT_MessageOfTheDay, CLIENT_TO_SERVER, EMPTY);
 		ByteBuffer header = p.encodeHeader();
 		p.decodeHeader(header);
 		p.print();
 	}
 	
 	/**
-	 * T4C 1.50 pak, created
-	 * @param type
-	 * @param isServerToClient
+	 * T4C 1.50 pak, created, encrypted, and ready to be sent.
+	 * @param type choosen from Paktypes
+	 * @param direction can be one of Pak150.CLIENT_TO_SERVER or Pak150.SERVER_TO_CLIENT
 	 * @param msg
 	 */
-	public Pak150(short type, boolean isServerToClient, byte[] msg){
-		this.isServerToClient = isServerToClient;
-		this.type = type;
-		timeStamp = System.currentTimeMillis();
-		micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
-		pak = ByteBuffer.allocate(msg.length+4);
-		pak.putShort(type);
-		pak.put(msg);
-		byte[] dat = new byte[pak.array().length-2];
-		pak.rewind();
-		pak.get(dat);
-		pak.putShort(createChecksum_150(dat));
-		seed = encrypt_150();
+	public Pak150(short typ, boolean direction, byte[] msg){
+		this.timeStamp = System.currentTimeMillis();
+		this.micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
+		this.isServerToClient = direction;
+		this.type = typ;
+		this.pak = ByteBuffer.allocate(msg.length+4);
+		this.pak.putShort(type);
+		this.pak.put(msg);
+		byte[] dat = new byte[this.pak.array().length-2];
+		this.pak.rewind();
+		this.pak.get(dat);
+		this.pak.putShort(createChecksum_150(dat));
+		this.seed = encrypt_150();
 		byte[] header = encodeHeader().array().clone();
 		byte[] encrypted_data = pak.array().clone();
-		pak = ByteBuffer.allocate(header.length+encrypted_data.length);
-		pak.put(header);
-		pak.put(encrypted_data);
+		this.pak = ByteBuffer.allocate(header.length+encrypted_data.length);
+		this.pak.put(header);
+		this.pak.put(encrypted_data);
 	}
 	
 	
 	/**
-	 * T4C 1.50 pak, received encrypted
+	 * T4C 1.50 pak, received, decrypted and ready to be dispatched
 	 * @param pack
-	 * @param direction : true = server->client
+	 * @param direction can be one of Pak150.CLIENT_TO_SERVER or Pak150.SERVER_TO_CLIENT
 	 * @param stamp
 	 * @param microseconds
 	 */
 	public Pak150(DatagramPacket pack, boolean direction, long stamp, long microseconds) {
-		timeStamp = stamp;
-		micros = microseconds;
-		isServerToClient = direction;
+		this.timeStamp = stamp;
+		this.micros = microseconds;
+		this.isServerToClient = direction;
 		ByteBuffer header = ByteBuffer.allocate(16);
 		//packet = pack;
 		header .put(pack.getData(),0,16);
 		header.order(ByteOrder.LITTLE_ENDIAN);
 		header.rewind();
 		decodeHeader(header);
-		pak = ByteBuffer.allocate(length-16);
-		pak.put(pack.getData(), 16, length-16);
-		pak.rewind();
+		this.pak = ByteBuffer.allocate(length-16);
+		this.pak.put(pack.getData(), 16, length-16);
+		this.pak.rewind();
 		//pak_crypt = pak.array().clone();
-		/*if(isTest)*/System.out.println("SOURCE "+HexString.from(pack.getData()));
+		Log.proxy.trace("SOURCE "+HexString.from(pack.getData()));
 		if(!isFragment) {
 			if(!isPong){
 				valid = decrypt_150();
 			}
 		}else{
-			System.err.println("FRAGMENT : "+isFragment);
+			Log.proxy.error("FRAGMENT : "+isFragment);
 			//TODO manage fragments
 		}
 		//print();
@@ -107,34 +117,49 @@ public class Pak150 {
 	 * @param header
 	 */
 	private void decodeHeader(ByteBuffer header) {
-		fragmentID = header.get();
+		this.fragmentID = header.get();
 		byte bitMask = header.get();
-		length = header.getShort();
-		isPong = isPong(bitMask);
-		if(isPong) {
-			length = 16;
-			datagramID = header.getInt();
+		this.length = header.getShort();
+		this.isPong = isPong(bitMask);
+		if(this.isPong) {
+			this.length = 16;
+			this.datagramID = header.getInt();
 		}else{		
-			isPing = isPing(bitMask);
-			isFragment = isFragment(bitMask);
-			datagramID = header.getInt();
-			firstPakID = header.getInt();
-			if(datagramID == firstPakID) isFirstFragment = true;
-			if(fragmentID != 0) isLastFragment = true;
-			seed = header.getInt();
+			this.isPing = isPing(bitMask);
+			this.isFragment = isFragment(bitMask);
+			this.datagramID = header.getInt();
+			this.firstPakID = header.getInt();
+			if(this.datagramID == this.firstPakID) this.isFirstFragment = true;
+			if(this.fragmentID != 0) this.isLastFragment = true;
+			this.seed = header.getInt();
 		}
 	}
 
+	/**
+	 * Tells if this pak is part of a fragmented pak
+	 * @param bitMask
+	 * @return
+	 */
 	private boolean isFragment(byte bitMask) {
 		if(ByteArrayToBinaryString.toBinary(bitMask).charAt(5) == '1')return true;
 		return false;
 	}
 
+	/**
+	 * Tells if this pak contains a ping instruction and therefore needs a pong answer.
+	 * @param bitMask
+	 * @return
+	 */
 	private boolean isPing(byte bitMask) {
 		if(ByteArrayToBinaryString.toBinary(bitMask).charAt(6) == '1')return true;
 		return false;
 	}
 
+	/**
+	 * Tells if this pak is a pong answer.
+	 * @param bitMask
+	 * @return
+	 */
 	private boolean isPong(byte bitMask) {
 		if(ByteArrayToBinaryString.toBinary(bitMask).charAt(7) == '1')return true;
 		return false;
@@ -144,9 +169,9 @@ public class Pak150 {
 	 * prints relevant infos about packet on standard output
 	 */
 	public void print() {
-		if(isPong){
+		if(this.isPong){
 			printPong();
-		}else if(isFragment){
+		}else if(this.isFragment){
 			printFragment();
 		}else{
 			StringBuilder sb = new StringBuilder();
@@ -154,20 +179,20 @@ public class Pak150 {
 			sb.append(System.lineSeparator());
 			sb.append("********************************************************************************************************************************");
 			sb.append(System.lineSeparator());
-			sb.append(CalendarUtils.getTimeStringFromLongMillis(timeStamp,micros));
+			sb.append(CalendarUtils.getTimeStringFromLongMillis(this.timeStamp,this.micros));
 			sb.append(System.lineSeparator());
-			if(isPing){
+			if(this.isPing){
 				sb.append("PING ");
-				sb.append(datagramID);
+				sb.append(this.datagramID);
 				sb.append(System.lineSeparator());
 			}
 			sb.append("TYPE ");
-			sb.append(HexString.from(type));
+			sb.append(HexString.from(this.type));
 			sb.append(System.lineSeparator());
-			sb.append(PakTypes.getTypeInfos(type, isServerToClient, pak));
+			sb.append(PakTypes.getTypeInfos(this.type, this.isServerToClient, this.pak));
 			sb.append("********************************************************************************************************************************");
 
-			Log.proxy.fatal(sb.toString());
+			Log.proxy.debug(sb.toString());
 		}
 	}
 	
@@ -177,14 +202,14 @@ public class Pak150 {
 		sb.append(System.lineSeparator());
 		sb.append("********************************************************************************************************************************");
 		sb.append(System.lineSeparator());
-		sb.append(CalendarUtils.getTimeStringFromLongMillis(timeStamp,micros));
+		sb.append(CalendarUtils.getTimeStringFromLongMillis(this.timeStamp,this.micros));
 		sb.append(System.lineSeparator());
 		sb.append("PONG ");
-		sb.append(datagramID);
+		sb.append(this.datagramID);
 		sb.append(System.lineSeparator());
 		sb.append("********************************************************************************************************************************");
 
-		Log.proxy.fatal(sb.toString());		
+		Log.proxy.debug(sb.toString());		
 	}
 
 
@@ -194,13 +219,13 @@ public class Pak150 {
 		sb.append(System.lineSeparator());
 		sb.append("********************************************************************************************************************************");
 		sb.append(System.lineSeparator());
-		sb.append(CalendarUtils.getTimeStringFromLongMillis(timeStamp,micros));
+		sb.append(CalendarUtils.getTimeStringFromLongMillis(this.timeStamp,this.micros));
 		sb.append(System.lineSeparator());
 		sb.append("FRAGMENT");
 		sb.append(System.lineSeparator());
 		sb.append("********************************************************************************************************************************");
 		
-		Log.proxy.fatal(sb.toString());		
+		Log.proxy.debug(sb.toString());		
 	}
 
 
@@ -217,15 +242,15 @@ public class Pak150 {
 		int algo;
 		TCryptoTable crypto = new TCryptoTable(pak.array().length);
 		// initialize the system's pseudo-random number generator from the seed given in the datagram
-		// (they apparently swapped the bytes in an attempt to confuse the reverse-engineerers)
-		System.out.println("SEED "+HexString.from(seed));
+		// (they apparently swapped the bytes in an attempt to confuse the reverse-engineers)
+		Log.proxy.trace("SEED "+HexString.from(seed));
 		byte b0,b1,b2,b3;
 		b0 = (byte) ((seed>>24) & 0xFF);
 		b1 = (byte) ((seed>>16) & 0xFF);
 		b2 = (byte) ((seed>>8) & 0xFF);
 		b3 = (byte) ((seed) & 0xFF);
 		int shiftedSeed = ((int)(b3 & 0xFF)<<24) | ((int)(b0 & 0xFF)<<16) | ((int)(b2 & 0xFF)<<8) | (int)(b1 & 0xFF);
-		/*if(isTest)*/System.out.println("SHIFTED SEED "+HexString.from(shiftedSeed));
+		Log.proxy.trace("SHIFTED SEED "+HexString.from(shiftedSeed));
 		MSRand srand = new MSRand(shiftedSeed);
 		   
 		// now generate the crypto tables for the given datagram length
@@ -233,26 +258,26 @@ public class Pak150 {
 		for (index = 0; index < 10; index++){
 			stack1[index] = (byte) srand.prng();
 			stack2[index] = (byte) srand.prng();
-			if(isTest)System.out.println("STACK1("+index+") "+HexString.from(stack1[index]));
-			if(isTest)System.out.println("STACK2("+index+") "+HexString.from(stack2[index]));
+			Log.proxy.trace("STACK1("+index+") "+HexString.from(stack1[index]));
+			Log.proxy.trace("STACK2("+index+") "+HexString.from(stack2[index]));
 		}
 		// xor table
 		for (index = 0 ; index < pak.array().length ; index++)
 		{
 			crypto.xor[index] = (int) stack2[srand.prng() % 10]&0xFF;
-			if(isTest)System.out.println("TMP("+index+") "+HexString.from(crypto.xor[index]));
+			Log.proxy.trace("TMP("+index+") "+HexString.from(crypto.xor[index]));
 			crypto.xor[index] *= (int) stack1[srand.prng() % 10]&0xFF;
-			if(isTest)System.out.println("TMP("+index+") "+HexString.from(crypto.xor[index]));
+			Log.proxy.trace("TMP("+index+") "+HexString.from(crypto.xor[index]));
 			crypto.xor[index] += srand.prng();
-			if(isTest)System.out.println("XOR("+index+") "+HexString.from(crypto.xor[index]));
+			Log.proxy.trace("XOR("+index+") "+HexString.from(crypto.xor[index]));
 		}
 		// offset & algo tables
 		for (index = 0; index < pak.array().length; index++){
 			crypto.offsets[index] = srand.prng() % pak.array().length;
 			if (crypto.offsets[index] == index) crypto.offsets[index] = (index == 0 ? 1 : 0);
-			if(isTest)System.out.println("OFFSETS("+index+") "+HexString.from(crypto.offsets[index]));
+			Log.proxy.trace("OFFSETS("+index+") "+HexString.from(crypto.offsets[index]));
 			crypto.algo[index] = srand.prng() % 21;
-			if(isTest)System.out.println("ALGO("+index+") "+HexString.from(crypto.algo[index]));
+			Log.proxy.trace("ALGO("+index+") "+HexString.from(crypto.algo[index]));
 
 		}
 		// cryptographic tables are generated, now apply the algorithm
@@ -260,8 +285,8 @@ public class Pak150 {
 			algo = crypto.algo[index];
 			pak_offset = pak.array()[crypto.offsets[index]];
 			pak_index = pak.array()[index];
-			/*if(isTest)*/System.out.println("PAKINDEX "+HexString.from(pak_index));
-			/*if(isTest)*/System.out.println("PAKOFFSET "+HexString.from(pak_offset));
+			Log.proxy.trace("PAKINDEX "+HexString.from(pak_index));
+			Log.proxy.trace("PAKOFFSET "+HexString.from(pak_offset));
 			if 	  	(algo == 0)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)			 ; 		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset)		  ;}
 		    else if (algo == 1)  { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)			 ; 		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0)) ;}
 		    else if (algo == 2)  { pak.array()[index] = (byte) (((pak_index >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0))	 ;		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) & 0xF0));}
@@ -284,51 +309,51 @@ public class Pak150 {
 		    else if (algo == 19) { pak.array()[index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) & 0xF0));		pak.array()[crypto.offsets[index]] = (byte) pak_index												  ;}
 		    else if (algo == 20) { pak.array()[index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset)			 ; 		pak.array()[crypto.offsets[index]] = (byte) (((pak_offset << 4) & 0xF0) | ((pak_index >>> 4) & 0x0F)) ;}
 			
-			if(isTest)System.out.println("["+algo+"]PAK("+index+") "+HexString.from(pak.array()[index]));
-			if(isTest)System.out.println("["+algo+"]PAK("+crypto.offsets[index]+") "+HexString.from(pak.array()[crypto.offsets[index]]));
+			Log.proxy.trace("["+algo+"]PAK("+index+") "+HexString.from(pak.array()[index]));
+			Log.proxy.trace("["+algo+"]PAK("+crypto.offsets[index]+") "+HexString.from(pak.array()[crypto.offsets[index]]));
 		}
-		System.out.println("AFTER ALGO DATA "+HexString.from(pak.array()));
+		Log.proxy.trace("AFTER ALGO DATA "+HexString.from(pak.array()));
 		// and finally, quadruple-XOR the data out
 		for (index=pak.array().length-1 ; index>=0; index--) {
 			if (index <= pak.array().length-4) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x000000FF); // we can XOR 4 bytes in a row
-				if(isTest)System.out.println("PAXOR("+index+") "+HexString.from(pak.array()[index]));
+				Log.proxy.trace("PAXOR("+index+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0x0000FF00) >> 8;
-				if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
+				Log.proxy.trace("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 				pak.array()[index + 2] ^= (crypto.xor[index] & 0x00FF0000) >> 16;
-				if(isTest)System.out.println("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
+				Log.proxy.trace("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
 				pak.array()[index + 3] ^= (crypto.xor[index] & 0xFF000000) >> 24;
-				if(isTest)System.out.println("PAXOR("+(index+3)+") "+HexString.from(pak.array()[index+3]));
+				Log.proxy.trace("PAXOR("+(index+3)+") "+HexString.from(pak.array()[index+3]));
 			}
 			else if (index == pak.array().length-3) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x0000FF); // we can XOR 3 bytes in a row
-				if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
+				Log.proxy.trace("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0x00FF00) >> 8;
-				if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
+				Log.proxy.trace("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 				pak.array()[index + 2] ^= (crypto.xor[index] & 0xFF0000) >> 16;
-				if(isTest)System.out.println("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
+				Log.proxy.trace("PAXOR("+(index+2)+") "+HexString.from(pak.array()[index+2]));
 			}
 			else if (index == pak.array().length-2) {
 				pak.array()[index + 0] ^= (crypto.xor[index] & 0x00FF); // we can XOR 2 bytes in a row
-				if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
+				Log.proxy.trace("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 				pak.array()[index + 1] ^= (crypto.xor[index] & 0xFF00) >> 8;
-				if(isTest)System.out.println("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
+				Log.proxy.trace("PAXOR("+(index+1)+") "+HexString.from(pak.array()[index+1]));
 			}
 			else if (index == pak.array().length-1){
 				pak.array()[index] ^= (crypto.xor[index] & 0xFF); // end of stream
-				if(isTest)System.out.println("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
+				Log.proxy.trace("PAXOR("+(index)+") "+HexString.from(pak.array()[index]));
 			}
 		}
-		System.out.println("DECRYPTED DATA "+HexString.from(pak.array()));
+		Log.proxy.trace("DECRYPTED DATA "+HexString.from(pak.array()));
 		// in the 1.50 protocol, the checksum info is at the trailing end of the pak.
 		pak.position(pak.array().length-2);
 		checksum = pak.getShort();
 		pak.rewind();
 		valid = checksum_150(checksum);
-		if(isTest)System.out.println("CHECKSUM "+HexString.from(checksum));
+		Log.proxy.trace("CHECKSUM "+HexString.from(checksum));
 		pak.rewind();
 		type = pak.getShort();
-		if(isTest)System.out.println("TYPE "+HexString.from(type));
+		Log.proxy.trace("TYPE "+HexString.from(type));
 		byte[] final_data = new byte[]{};
 		if(pak.array().length>4){
 			final_data = new byte[pak.array().length-4];
@@ -339,10 +364,14 @@ public class Pak150 {
 		pak = ByteBuffer.allocate(final_data.length);
 		pak.put(final_data);
 		pak.rewind();
-		if(isTest)System.out.println("PAK "+HexString.from(pak.array()));
+		Log.proxy.trace("PAK "+HexString.from(pak.array()));
 		return valid;
 	}
 	
+	/**
+	 * Encrypts 1.50 data
+	 * @return
+	 */
 	private int encrypt_150 (){
 		// the 1.50 protocol cryptography uses extensively the standard long C random number generator,
 		// which is a VERY BAD idea, since its implementation may differ from system to system !!!
@@ -361,7 +390,7 @@ public class Pak150 {
 		seed = 0x002C81FF;
 		//seed=0xAABBCCDD;
 		
-		System.out.println("RANDOM SEED "+HexString.from(seed));
+		Log.proxy.trace("RANDOM SEED "+HexString.from(seed));
 		// generate a random seed for this pak's encryption
 		// initialize the system's pseudo-random number generator from the seed used in the datagram
 		// (they apparently swapped the bytes in an attempt to confuse the reverse-engineerers)
@@ -378,7 +407,7 @@ public class Pak150 {
 		b2 = (byte) ((seed>>8) & 0xFF);
 		b3 = (byte) ((seed) & 0xFF);
 		return_seed = ((int)(b1 & 0xFF)<<24) | ((int)(b3 & 0xFF)<<16) | ((int)(b2 & 0xFF)<<8) | (int)(b0 & 0xFF);
-		System.out.println("SHIFTED RANDOM SEED "+HexString.from(return_seed));
+		Log.proxy.trace("SHIFTED RANDOM SEED "+HexString.from(return_seed));
 
 		
 		// if new data size requires us to allocate more pages for pak data, do it
@@ -394,7 +423,7 @@ public class Pak150 {
 
 		// now generate the crypto tables for the given datagram length
 
-		System.out.println("TO BE ENCRYPTED DATA "+HexString.from(pak.array()));
+		Log.proxy.trace("TO BE ENCRYPTED DATA "+HexString.from(pak.array()));
 
 		
 		// stack sequences
@@ -438,7 +467,7 @@ public class Pak150 {
 				pak.array()[index] ^= (crypto.xor[index] & 0xFF); // end of stream
 			}
 		}
-		System.out.println("BEFORE ALGO DATA "+HexString.from(pak.array()));
+		Log.proxy.trace("BEFORE ALGO DATA "+HexString.from(pak.array()));
 
 		// and finally, apply the algorithm
 		for (index = pak.array().length - 1; index >= 0; index--){
@@ -447,8 +476,8 @@ public class Pak150 {
 			pak_offset = pak.array()[crypto.offsets[pak.array().length - 1 - index]];
 			pak_index = pak.array()[pak.array().length - 1 - index];
 			
-			/*if(isTest)*/System.out.println("PAKINDEX "+HexString.from(pak_index));
-			/*if(isTest)*/System.out.println("PAKOFFSET "+HexString.from(pak_offset));
+			Log.proxy.trace("PAKINDEX "+HexString.from(pak_index));
+			Log.proxy.trace("PAKOFFSET "+HexString.from(pak_offset));
 			
 			if 	  	(algo == 0)  { pak.array()[pak.array().length - 1 - index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)			 ; 		pak.array()[crypto.offsets[pak.array().length - 1 - index]] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_offset)		  ;}
 		    else if (algo == 1)  { pak.array()[pak.array().length - 1 - index] = (byte) (((pak_offset ^ pak_index) & 0x0F) ^ pak_index)			 ; 		pak.array()[crypto.offsets[pak.array().length - 1 - index]] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_index << 4) & 0xF0)) ;}
@@ -472,11 +501,11 @@ public class Pak150 {
 		    else if (algo == 19) { pak.array()[pak.array().length - 1 - index] = (byte) (((pak_offset >>> 4) & 0x0F) | ((pak_offset << 4) & 0xF0));		pak.array()[crypto.offsets[pak.array().length - 1 - index]] = (byte) pak_index												  ;}
 		    else if (algo == 20) { pak.array()[pak.array().length - 1 - index] = (byte) (((pak_offset ^ pak_index) & 0x0F)^pak_offset)			 ; 		pak.array()[crypto.offsets[pak.array().length - 1 - index]] = (byte) (((pak_offset << 4) & 0xF0) | ((pak_index >>> 4) & 0x0F)) ;}
 			
-			if(isTest)System.out.println("["+algo+"]PAK("+index+") "+HexString.from(pak.array()[index]));
-			if(isTest)System.out.println("["+algo+"]PAK("+crypto.offsets[index]+") "+HexString.from(pak.array()[crypto.offsets[index]]));
+			Log.proxy.trace("["+algo+"]PAK("+index+") "+HexString.from(pak.array()[index]));
+			Log.proxy.trace("["+algo+"]PAK("+crypto.offsets[index]+") "+HexString.from(pak.array()[crypto.offsets[index]]));
 		}
-		System.out.println("ENCRYPTED DATA "+HexString.from(pak.array()));
-		System.out.println("=============================================================================================================================");
+		Log.proxy.trace("ENCRYPTED DATA "+HexString.from(pak.array()));
+		Log.proxy.trace("=============================================================================================================================");
 		return (return_seed); // finished, pak is encrypted
 	}
 	
@@ -493,7 +522,7 @@ public class Pak150 {
 		// for each byte of data...
 		for (index = 0; index < dat.length; index++){
 			sum += (~(dat[index]) & 0xFF); // add its inverse value to the checksum
-			if(isTest)System.out.println("CHECK("+index+") "+HexString.from(sum));
+			Log.proxy.trace("CHECK("+index+") "+HexString.from(sum));
 		}
 		return (short) (((sum << 8) & 0xFF00)|((sum >> 8) & 0xFF));
 	}
@@ -510,7 +539,7 @@ public class Pak150 {
 		pak.get(dat);
 		short sum = createChecksum_150(dat);
 		if(sum == checksum)return true;
-		//System.err.println("BAD CHECKSUM : "+HexString.from(sum)+"!= "+HexString.from(checksum));
+		Log.proxy.error("BAD CHECKSUM : "+HexString.from(sum)+"!= "+HexString.from(checksum));
 		return false;
 	}
 	
@@ -529,6 +558,10 @@ public class Pak150 {
 	}
 
 
+	/**
+	 * Creates header bytes, ready to be used in a pak
+	 * @return
+	 */
 	private ByteBuffer encodeHeader() {
 		ByteBuffer result = ByteBuffer.allocate(16);
 		result.order(ByteOrder.LITTLE_ENDIAN);
@@ -547,6 +580,10 @@ public class Pak150 {
 	}
 
 
+	/**
+	 * Creates a bitmask, to be put inside of a header
+	 * @return
+	 */
 	private byte createBitMask() {
 		byte bitmask = 0;
 		if (isPong) bitmask += 1;
@@ -555,10 +592,18 @@ public class Pak150 {
 		return bitmask;
 	}
 
+	/**
+	 * Get the type of a pak, to be used with PakTypes
+	 * @return
+	 */
 	public short getType() {
 		return type;
 	}
 
+	/**
+	 * Get a pak's data
+	 * @return
+	 */
 	public byte[] getData() {
 		return pak.array();
 	}

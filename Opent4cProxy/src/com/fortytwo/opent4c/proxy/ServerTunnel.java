@@ -35,7 +35,7 @@ public class ServerTunnel {
 	 */
 	public static void pile(DatagramPacket packet) {
 		sendpile.add(packet);
-		Log.server.fatal("Message to added to pile ("+sendpile.size()+")");
+		Log.server.debug("Message to added to pile ("+sendpile.size()+")");
 	}
 
 	/**
@@ -44,7 +44,7 @@ public class ServerTunnel {
 	 * @throws IOException 
 	 */
 	public static void startSendPile() throws InterruptedException, IOException {
-		Log.server.fatal("Server send pile ready");
+		Log.server.info("Server send pile ready");
 		while(online){
 			while(sendpile.size() != 0){
 				send(sendpile.get(0));
@@ -76,7 +76,7 @@ public class ServerTunnel {
 		long micros;
 		long stamp;
 		ByteBuffer sendData = null;
-		Log.server.fatal("Listening for server messages");
+		Log.server.info("Listening for server messages");
 		while(online){
 			receiveData = new byte[1024];
 			receivePacket = new DatagramPacket(receiveData, receiveData.length);
@@ -84,17 +84,17 @@ public class ServerTunnel {
 			micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
 			stamp = System.currentTimeMillis();
 			int port = receivePacket.getPort();
-			Log.server.fatal("Incoming message");
-			ClientTunnel c = ClientTunnel.getByPort(port);
+			Log.server.debug("Incoming message to "+port);
+			ClientTunnel c = ClientManager.getClientByPort(port);
 			if (Proxy.serverVersion == 150){
-				Pak150 decrypted = new Pak150(receivePacket, true, stamp, micros);
+				Pak150 decrypted = new Pak150(receivePacket, Pak150.SERVER_TO_CLIENT, stamp, micros);
 				sendData = decrypted.getSendData();
 			}else if (Proxy.serverVersion == 125){
-				Pak125 decrypted = new Pak125(receivePacket, true, stamp, micros);
+				Pak125 decrypted = new Pak125(receivePacket, Pak150.SERVER_TO_CLIENT, stamp, micros);
 				sendData = decrypted.getSendData();
 			}
 			DatagramPacket sendPacket = new DatagramPacket(sendData.array(), sendData.array().length, c.ip, c.port);
-			c.pile(sendPacket);
+			ClientManager.pile(sendPacket);
 		}
 	}
 	
@@ -104,6 +104,6 @@ public class ServerTunnel {
 	 */
 	public static void createSocket() throws SocketException {
 		toServerSocket = new DatagramSocket();
-		Log.server.fatal("Server Socket created");
+		Log.server.info("Server Socket created");
 	}
 }

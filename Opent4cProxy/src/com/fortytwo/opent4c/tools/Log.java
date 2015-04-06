@@ -2,7 +2,6 @@ package com.fortytwo.opent4c.tools;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.config.XMLConfigurationFactory;
 
 
 public class Log {
@@ -12,6 +11,13 @@ public class Log {
 	public static final Logger bot = LogManager.getLogger("bot");
 	
 	public static void initLogger() {
-		System.setProperty(XMLConfigurationFactory.CONFIGURATION_FILE_PROPERTY, "res/log4j2.xml");
+		Log.proxy.fatal("Log Level Test.");
+		Log.proxy.fatal("FATAL OK");
+		Log.proxy.error("ERROR OK");
+		Log.proxy.warn("WARN OK");
+		Log.proxy.info("INFO OK");
+		Log.proxy.debug("DEBUG OK");
+		Log.proxy.trace("TRACE OK");
+		Log.proxy.fatal("================================");
 	}
 }

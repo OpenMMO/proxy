@@ -16,10 +16,12 @@ import java.util.concurrent.Executors;
 
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.config.XMLConfigurationFactory;
 
 import com.fortytwo.opent4c.bot.bot150;
 import com.fortytwo.opent4c.tools.CalendarUtils;
 import com.fortytwo.opent4c.tools.Log;
+import com.fortytwo.opent4c.tools.PakTypes;
 
 /**
  * Proxy for translating T4C paks form version to version between client and server, and to translate T4C paks to and from openT4C paks.
@@ -36,39 +38,33 @@ public class Proxy {
 	public static int serverVersion;
 	public static InetAddress serverAddress;
 	private static boolean bot;
-	private static ExecutorService exService = Executors.newFixedThreadPool(5);
-	private static Runnable clientSendPile;
+	private static ExecutorService exService = Executors.newFixedThreadPool(4);
 	private static Runnable serverSendPile;
 	private static Runnable serverTunnel;
-	private static Runnable clientTunnel;
 	private static Runnable botRunnable;
+	private static ClientManager clientManager;
 	
 	public static void main(String[] args) throws IOException {
-		Pak150 encrypted = new Pak150((short) 0x42, false, new byte[]{});
+		System.setProperty(XMLConfigurationFactory.CONFIGURATION_FILE_PROPERTY, "res/log4j2.xml");
+		Log.initLogger();
+		//Pak150 encrypted = new Pak150(PakTypes.PAK_CLIENT_MessageOfTheDay, Pak150.CLIENT_TO_SERVER, Pak150.EMPTY);
 		//Log.client.fatal(HexString.from(encrypted.getData()));
-		DatagramPacket sendPacket = new DatagramPacket(encrypted.getData(), encrypted.getData().length, Proxy.serverAddress, Proxy.serverPort);
-		new Pak150(sendPacket, false, 0, 0);
-		/*Log.initLogger();
+		//DatagramPacket sendPacket = new DatagramPacket(encrypted.getData(), encrypted.getData().length, Proxy.serverAddress, Proxy.serverPort);
+		//new Pak150(sendPacket, false, 0, 0);
 		if(args.length != 0){
-			Log.proxy.error("Program takes no arguments, see proxy.cfg file instead.");
+			Log.proxy.fatal("Program takes no arguments, see proxy.cfg file instead.");
 			System.exit(1);
 		}
 		while(System.currentTimeMillis() % 1000 != 0){
 			startTime = System.nanoTime();
 		}
-		Log.proxy.fatal("fatal");
-		Log.proxy.error("error");
-		Log.proxy.warn("warn");
-		Log.proxy.info("info");
-		Log.proxy.debug("debug");
-		Log.proxy.trace("trace");
-
-		Log.proxy.fatal("Starting proxy");
 		readCfgFile(cfgFile);
-		createSockets();
-		startSendPiles();
-		openTunnels();
-		if(bot) createBot();*/
+		ServerTunnel.createSocket();
+		startServerSendPile();
+		openServerTunnel();
+		clientManager = new ClientManager();
+		if(bot) createBot();
+
 	}
 
 	/**
@@ -93,22 +89,24 @@ public class Proxy {
 	 * @throws IOException 
 	 */
 	private static void readCfgFile(String cfg) throws IOException {
-		Log.proxy.fatal("Reading configuration file");
+		Log.proxy.info("Reading configuration file");
 		BufferedReader buff = null;
 		try {
 			buff = new BufferedReader(new FileReader(new File(cfg)));
 		} catch (FileNotFoundException e) {
-			Log.proxy.error("File proxy.cfg not found, please check and try again.");
+			Log.proxy.fatal("File proxy.cfg not found, please check and try again.");
+			Log.proxy.fatal(cfg);
 			System.exit(1);
 		}			 
 		String line;
 		while ((line = buff.readLine()) != null) {
 			readCfgLine(line);
 		}
+		Log.proxy.info("================================");
 	}
 
 	/**
-	 * reads a line from config file escaping line starting with # or with //
+	 * reads a line from config file escaping lines starting with # or with //
 	 * @param line
 	 * @throws UnknownHostException 
 	 */
@@ -116,7 +114,7 @@ public class Proxy {
 		if(line.startsWith("#") || line.startsWith("//") || line.equalsIgnoreCase("")) return;
 		String[] params = line.split("=");
 		if(params.length != 2){
-			Log.proxy.error("Line should be PARAM=VALUE");
+			Log.proxy.error("Syntax error : line should be PARAM=VALUE");
 			Log.proxy.error(line);
 			return;
 		}
@@ -128,45 +126,10 @@ public class Proxy {
 		else if(params[0].equalsIgnoreCase("proxy port"))proxyPort = Integer.parseInt(params[1]);
 		else if(params[0].equalsIgnoreCase("bot"))bot = Boolean.parseBoolean(params[1]);
 		else{
-			Log.proxy.fatal("Unknown parameter "+ line);
+			Log.proxy.error("Unknown parameter "+ line);
 			return;
 		}
-		Log.proxy.fatal(params[0]+" = "+params[1]);
-	}
-	
-	/**
-	 * Creates client and server sockets
-	 * we are server for clients and client for server
-	 * @throws SocketException
-	 */
-	private static void createSockets() throws SocketException {
-		ServerTunnel.createSocket();
-		ClientTunnel.createSocket(proxyPort);		
-	}
-
-	/**
-	 * Starts waiting for messages
-	 */
-	private static void openTunnels() {
-		openClientTunnel();
-		openServerTunnel();
-	}
-
-	/**
-	 * Starts waiting for client messages
-	 */
-	private static void openClientTunnel() {
-		clientTunnel = new Runnable(){
-			public void run(){
-				try {
-					ClientTunnel.listen();
-				} catch (IOException e) {
-					e.printStackTrace();
-					System.exit(1);
-				}
-			}
-		};
-		exService.submit(clientTunnel);
+		Log.proxy.info(params[0]+" = "+params[1]);
 	}
 
 	/**
@@ -184,31 +147,6 @@ public class Proxy {
 			}
 		};
 		exService.submit(serverTunnel);		
-	}
-
-	/**
-	 * Starts waiting for messages to send
-	 */
-	private static void startSendPiles() {
-		startClientSendPile();
-		startServerSendPile();
-	}
-
-	/**
-	 * Starts waiting for messages to send to client
-	 */
-	private static void startClientSendPile() {
-		clientSendPile = new Runnable(){
-			public void run(){
-				try {
-					ClientTunnel.startSendPile();
-				} catch (InterruptedException | IOException e) {
-					e.printStackTrace();
-					System.exit(1);
-				}
-			}
-		};
-		exService.submit(clientSendPile);		
 	}
 
 	/**
