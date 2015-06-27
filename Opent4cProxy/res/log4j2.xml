@@ -1,13 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration status="OFF">
-	<appenders>
-		<console name="Console" target="SYSTEM_OUT">
+<Configuration status="warn" name="T4C_OPEN_PROXY" packages="">
+	<Appenders>
+		<Console name="server_console" target="SYSTEM_OUT">
 			<patternLayout pattern="%d{HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
-		</console>
-	</appenders>
+		</Console>
+		<Console name="proxy_console" target="SYSTEM_OUT">
+			<patternLayout pattern="%d{HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+		</Console>
+		<Console name="client_console" target="SYSTEM_OUT">
+			<patternLayout pattern="%d{HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+		</Console>
+		<Console name="bot_console" target="SYSTEM_OUT">
+			<patternLayout pattern="%d{HH:mm:ss} [%t] %-5level %logger{36} - %msg%n"/>
+		</Console>
+    	<File name="logfile" fileName="root.log">
+      		<PatternLayout>
+        		<Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+      		</PatternLayout>
+    	</File>
+    	<Async name="file">
+      		<AppenderRef ref="logfile"/>
+    	</Async>
+	</Appenders>
 	<loggers>
-		<root level="debug">
-			<appenderRef ref="Console"/>
+		<root level="DEBUG">
+			<appenderRef ref="file"/>
 		</root>
+		<logger name="server" level="INFO">
+			<appenderRef ref="server_console"/>
+		</logger>
+		<logger name="proxy" level="INFO">
+			<appenderRef ref="proxy_console"/>
+		</logger>
+		<logger name="client" level="INFO">
+			<appenderRef ref="client_console"/>
+		</logger>
+		<logger name="bot" level="INFO">
+			<appenderRef ref="bot_console"/>
+		</logger>
 	</loggers>
-</configuration>
+</Configuration>

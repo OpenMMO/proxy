@@ -4,15 +4,15 @@ public class HexString {
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 	
 	public static String from(byte[] bytes){
-	    char[] hexChars = new char[bytes.length * 6];
+	    char[] hexChars = new char[bytes.length * 3];
 	    for ( int j = 0; j < bytes.length; j++ ) {
 	        int v = bytes[j] & 0xFF;
-	        hexChars[j * 6 + 0] = '0';
-	        hexChars[j * 6 + 1] = 'x';
-	        hexChars[j * 6 + 2] = hexArray[v >>> 4];
-	        hexChars[j * 6 + 3] = hexArray[v & 0x0F];
-	        hexChars[j * 6 + 4] = ',';
-	        hexChars[j * 6 + 5] = ' ';
+	        //hexChars[j * 6 + 0] = '0';
+	        //hexChars[j * 6 + 1] = 'x';
+	        hexChars[j * 3 + 0] = hexArray[v >>> 4];
+	        hexChars[j * 3 + 1] = hexArray[v & 0x0F];
+	        //hexChars[j * 6 + 4] = ',';
+	        hexChars[j * 3 + 2] = ' ';
 	    }
 	    return new String(hexChars);
 	}

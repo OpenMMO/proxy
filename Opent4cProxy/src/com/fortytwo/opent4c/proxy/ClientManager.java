@@ -16,24 +16,26 @@ import com.fortytwo.opent4c.tools.Log;
 
 /**
  * Manages multiple clients. Receives all client messages and dispatches the to the right ClientTunnel.
- * @author syno
+ * @author aTom
  *
  */
 public class ClientManager {
 	private static ExecutorService exService;
-	private static DatagramSocket socket;
+	private static DatagramSocket toClientsocket;
 	private static Runnable clientSendPile;
 	private static Runnable clientListener;
 	private static boolean online = true;
 	public static List<ClientTunnel> clients = Collections.synchronizedList(new ArrayList<ClientTunnel>());
+	public static List<ServerTunnel> servers = Collections.synchronizedList(new ArrayList<ServerTunnel>());
 	public static List<DatagramPacket> sendpile = Collections.synchronizedList(new ArrayList<DatagramPacket>());
 	private static Runnable dispatcher;
+
 
 	
 	public ClientManager() throws SocketException {
 		exService = Executors.newFixedThreadPool(2+Proxy.max_clients);
-		createSocket();
-		startSendPile();
+		createClientSocket();
+		startClientSendPile();
 		startClientListener();
 	}
 	
@@ -41,24 +43,26 @@ public class ClientManager {
 	 * Creates a server socket listening for client messages on given port
 	 * @throws SocketException 
 	 */
-	private static void createSocket() throws SocketException {
-		socket = new DatagramSocket(Proxy.proxyPort);
+	private static void createClientSocket() throws SocketException {
+		toClientsocket = new DatagramSocket(Proxy.proxyPort);
 		Log.client.info("Client socket created");
 	}
 
 	/**
 	 * Starts waiting for messages to send to client
 	 */
-	private static void startSendPile() {
+	private static void startClientSendPile() {
 		clientSendPile = new Runnable(){
 			public void run(){
 				try {
 					Log.client.info("Client send pile ready");
-					while(online && sendpile.size() != 0){
-						send(sendpile.get(0));
-						sendpile.remove(0);
+					while(online){
+						while(sendpile.size() != 0){
+							sendToClient(sendpile.get(0));
+							sendpile.remove(0);
+						}
+						Thread.sleep(Proxy.netspeed);
 					}
-					Thread.sleep(0,1000);
 				} catch (InterruptedException | IOException e) {
 					Log.client.fatal(e.toString());
 					System.exit(1);
@@ -73,9 +77,9 @@ public class ClientManager {
 	 * @param packet
 	 * @throws IOException 
 	 */
-	private static void send(DatagramPacket packet) throws IOException {
-		socket.send(packet);
-		Log.client.debug("Message to client sent");
+	private static void sendToClient(DatagramPacket packet) throws IOException {
+		toClientsocket.send(packet);
+		Log.client.debug("Message to client sent : "+packet.getAddress()+":"+packet.getPort());
 	}
 	
 	/**
@@ -110,35 +114,68 @@ public class ClientManager {
 		Log.client.info("Listening for client messages");
 		while(online){
 			receiveData = new byte[1024];
-			receivePacket = new DatagramPacket(receiveData, receiveData.length);
-			socket.receive(receivePacket);
+			receivePacket = new DatagramPacket(receiveData, receiveData.length);			
+			toClientsocket.receive(receivePacket);
+			short length = getLength(receiveData);
+			byte[] data = new byte[length];
+			for (int i =0 ; i< length ; i++){
+				data[i] = receiveData[i];
+			}
 			Log.client.debug("Message received");
 			micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
 			stamp = System.currentTimeMillis();
 			port = receivePacket.getPort();
 			if(!isKnownClient(port)){
 				InetAddress ip = receivePacket.getAddress();
-				clients.add(new ClientTunnel(ip, port));
-				dispatchMessage(port, stamp, micros, receivePacket);
+				addClient(ip, port);
+				dispatchMessage(port, stamp, micros, receivePacket, data);
 			}else{
-				dispatchMessage(port, stamp, micros, receivePacket);
+				dispatchMessage(port, stamp, micros, receivePacket, data);
 			}
 		}
 	}
 	
+	private static short getLength(byte[] data) {
+		byte b1,b2;
+		b1 = data[2];
+		b2 = data[3];
+		short l = (short) ((b2<<8 & 0xFF00)|(b1 & 0x00FF));
+		if (l == 0) l = 16;
+		Log.proxy.debug("PAK LENGTH : "+l);
+		return l;
+	}
+
 	/**
-	 * Dispatches a received messages to the right clientTunnel
+	 * Creates a new client, that is, keep client's port to identify it and create client socket to server
+	 * @param ip
+	 * @param port
+	 * @throws SocketException
+	 */
+	private static void addClient(InetAddress ip, int port) throws SocketException {
+		clients.add(new ClientTunnel(ip, port));
+		ServerTunnel s = new ServerTunnel(ip,port);
+		servers.add(s);
+		s.createSocket();
+		s.startServerSendPile();
+		s.openServerTunnel();
+		
+		//TODO create ServerTunnel here and put it in a list same as clients... seems ok
+	}
+
+	/**
+	 * Dispatches messages to the right clientTunnel, to be sent to server.
 	 * @param port
 	 * @param stamp
 	 * @param micros
 	 * @param receivePacket
 	 */
-	private static void dispatchMessage(final int port, final long stamp, final long micros, final DatagramPacket receivePacket) {
+	private static void dispatchMessage(final int port, final long stamp, final long micros, final DatagramPacket receivePacket, final byte[] data) {
 		dispatcher = new Runnable(){
 			public void run(){
 				ClientTunnel c = getClientByPort(port);
+				ServerTunnel s = getServerByPort(port);
 				Log.client.debug("Message dispatched @"+c.ip.getHostAddress()+":"+c.port);
-				c.getMessage(stamp, micros, receivePacket);
+				c.getMessage(s, stamp, micros, data);
 			}
 		};
 		exService.submit(dispatcher);		
@@ -174,6 +211,20 @@ public class ClientManager {
 	}
 	
 	/**
+	 * Returns a serverTunnel from a port number
+	 * @param port
+	 * @return
+	 */
+	public static ServerTunnel getServerByPort(int port) {
+		Iterator<ServerTunnel> it = servers.iterator();
+		while(it.hasNext()){
+			ServerTunnel s = it.next();
+			if(s.port == port) return s;
+		}
+		return null;
+	}
+	
+	/**
 	 * Adds a message to send pile
 	 * @param packet
 	 */
@@ -181,4 +232,6 @@ public class ClientManager {
 		sendpile.add(packet);
 		Log.client.debug("Message to client added to pile ("+sendpile.size()+")");
 	}
+	
+
 }

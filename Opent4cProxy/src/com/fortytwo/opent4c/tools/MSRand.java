@@ -21,6 +21,10 @@ public class MSRand {
 	public MSRand(int seed){
 		next = seed;
 	}
+
+	public MSRand(long seed){
+		next = (int)seed;
+	}
 	
 	public int prng(){
 		next = (next * 0x343fd) + 0x269ec3;
@@ -28,7 +32,6 @@ public class MSRand {
 	}
 	
 	public static int lrand(){
-		MSRand rnd = new MSRand((int) System.currentTimeMillis());
-		return rnd.prng();
+		return (int) ((System.currentTimeMillis() * 0x343fd) + 0x269ec3);
 	}
 }

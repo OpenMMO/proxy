@@ -146,10 +146,56 @@ public class PakTypes {
 	 * @return
 	 */
 	public static String getTypeInfos(short type, boolean isServerToClient, ByteBuffer pak) {
+		pak.rewind();
 		if(isServerToClient)return getServerTypeInfos(type, pak);
 		return getClientTypeInfos(type, pak);
 	}
 	
+	private static short getInt8(ByteBuffer pak, StringBuilder sb, String name){
+		short num = (short) (pak.get() & 0xFF);
+		sb.append(name+" : "+num);
+		sb.append(System.lineSeparator());
+		return num;
+	}
+	
+	private static int getInt16(ByteBuffer pak, StringBuilder sb, String name){
+		int num = (int) pak.getShort() & 0xFFFF;
+		sb.append(name+" : "+num);
+		sb.append(System.lineSeparator());
+		return num;
+	}
+
+	private static long getInt32(ByteBuffer pak, StringBuilder sb, String name){
+		long num = (long) pak.getInt() & 0xFFFFFFFF;
+		sb.append(name+" : "+num);
+		sb.append(System.lineSeparator());
+		return num;
+	}
+	
+	private static long getInt64(ByteBuffer pak, StringBuilder sb, String name){
+		long num = (long) pak.getLong() & 0xFFFFFFFFFFFFFFFFl;
+		sb.append(name+" : "+num);
+		sb.append(System.lineSeparator());
+		return num;
+	}
+	
+	private static void getString8(ByteBuffer pak, StringBuilder sb, String name){
+		byte size = pak.get();
+		sb.append(name + "("+size+") : ");
+		byte[] text = new byte[size];
+		pak.get(text,0,size);
+		sb.append(new String(text));
+		sb.append(System.lineSeparator());
+	}
+	
+	private static void getString16(ByteBuffer pak, StringBuilder sb, String name){
+		short size = pak.getShort();
+		sb.append(name + "("+size+") : ");
+		byte[] text = new byte[size];
+		pak.get(text,0,size);
+		sb.append(new String(text));
+		sb.append(System.lineSeparator());
+	}
 	
 	public static String getClientTypeInfos(short type, ByteBuffer pak) {
 		StringBuilder sb = new StringBuilder();
@@ -179,21 +225,33 @@ public class PakTypes {
 				"   2   int16 x_coord; // object's X coordinate on map"+System.lineSeparator()+
 				"   4   int16 y_coord; // object's Y coordinate on map"+System.lineSeparator()+
 				"   6   int32 object_id; // object unit ID");
+				getInt16(pak, sb, "x_coord");
+				getInt16(pak, sb, "y_coord");
+				getInt32(pak, sb, "object_ID");
 		break;
 		case 0x000C : sb.append("PAK_CLIENT_DepositObject 0x000C"+System.lineSeparator()+
 				"   2   int16 x_coord; // object's X coordinate on map"+System.lineSeparator()+
 				"   4   int16 y_coord; // object's Y coordinate on map"+System.lineSeparator()+
 				"   6   int32 object_id; // object unit ID"+System.lineSeparator()+
 				"   10   int32 item_count; // amount of same objects in this unit, if the objects are stacked");
+				getInt16(pak, sb, "x_coord");
+				getInt16(pak, sb, "y_coord");
+				getInt32(pak, sb, "object_ID");
+				getInt32(pak, sb, "item_count");
 		break;
 		case 0x000D : sb.append("PAK_CLIENT_PutPlayerInGame 0x000D"+System.lineSeparator()+
-				"   2   string8 playername;");
+				"   2   string8 playername;"+System.lineSeparator());
+				getString8(pak, sb, "Player Name");
 		break;
 		case 0x000E : sb.append("PAK_CLIENT_Login 0x000E"+System.lineSeparator()+
 				"   2   string8 login;"+System.lineSeparator()+
 				"   2+[1+S]   string8 password;"+System.lineSeparator()+
 				"   2+[1+S]+[1+S]+2   int16 client_version_number;"+System.lineSeparator()+
-				"   2+[1+S]+[1+S]+4   int16 unknown;");
+				"   2+[1+S]+[1+S]+4   int16 unknown;"+System.lineSeparator());
+				getString8(pak, sb, "Login");
+				getString8(pak, sb, "Password");
+				getInt16(pak, sb, "Client Version Number");
+				getInt16(pak, sb, "Unknown");
 		break;
 		case 0x000F : sb.append("PAK_CLIENT_DeletePlayer 0x000F"+System.lineSeparator()+
 				"   2   string8 playername;");
@@ -243,12 +301,19 @@ public class PakTypes {
 				"   2   int32 unit_id; // player ID in database"+System.lineSeparator()+
 				"   6   int8 unit_orientation; // usually 0 (means don't change current orientation)"+System.lineSeparator()+
 				"   7   int32 text_color; // seems unused, usually 00 00 BE BE"+System.lineSeparator()+
-				"   11   string16 message;");
+				"   11   string16 message;"+System.lineSeparator());
+				getInt32(pak, sb, "Unit ID");
+				getInt8(pak, sb, "Unit Orientation");
+				getInt32(pak, sb, "Text Color");
+				getString16(pak, sb, "Message");
 		break;
 		case 0x001C : sb.append("PAK_CLIENT_Shout 0x001C // main channel talk"+System.lineSeparator()+
 				"   2   string16 playername; // ignored (corrected by server if wrong)"+System.lineSeparator()+
 				"   2+[2+S]   int32 text_color; // unused"+System.lineSeparator()+
 				"   2+[2+S]+4   string16 message;");
+				getString16(pak, sb, "Player Name");
+				getInt32(pak, sb, "Text Color");
+				getString16(pak, sb, "Message");
 		break;
 		case 0x001D : sb.append("PAK_CLIENT_Page 0x001D // whisp"+System.lineSeparator()+
 				"   2   string16 target_playername;"+System.lineSeparator()+
@@ -332,7 +397,9 @@ public class PakTypes {
 		break;
 		case 0x0030 : sb.append("PAK_CLIENT_EnterChannel 0x0030"+System.lineSeparator()+
 				"   2   string16 channelname;"+System.lineSeparator()+
-				"   2+[2+S]   string16 password;");
+				"   2+[2+S]   string16 password;"+System.lineSeparator());
+				getString16(pak, sb, "Channel Name");
+				getString16(pak, sb, "Password");
 		break;
 		case 0x0031 : sb.append("PAK_CLIENT_ChannelMessage 0x0031"+System.lineSeparator()+
 				"   2   string16 channelname;"+System.lineSeparator()+
@@ -380,14 +447,16 @@ public class PakTypes {
 				"   8   int8 luck; // unused");
 		break;
 		case 0x003B : sb.append("PAK_CLIENT_ItemName 0x003B"+System.lineSeparator()+
-				"   2   int32 item_id;");
+				"   2   int32 item_id;"+System.lineSeparator());
+				getInt32(pak, sb, "Item ID");
 		break;
 		case 0x003C : sb.append("PAK_CLIENT_GetNearItems 0x003C");
 		break;
 		case 0x003D : sb.append("PAK_CLIENT_Unknown61 0x003D // unused (probably obsolete)");
 		break;
 		case 0x003E : sb.append("PAK_CLIENT_PersonalSpellList 0x003E"+System.lineSeparator()+
-				"   2   int8 unknown; // 0x01 if god");
+				"   2   int8 unknown; // 0x01 if god"+System.lineSeparator());
+				getInt8(pak, sb, "Unknown (god?)");
 		break;
 		case 0x003F : sb.append("PAK_CLIENT_Unknown63 0x003F");
 		break;
@@ -402,7 +471,10 @@ public class PakTypes {
 		case 0x0044 : sb.append("PAK_CLIENT_PuppetInformation 0x0044"+System.lineSeparator()+
 				"   2   int32 unit_id;"+System.lineSeparator()+
 				"   6   int16 x_coord;"+System.lineSeparator()+
-				"   8   int16 y_coord;");
+				"   8   int16 y_coord;"+System.lineSeparator());
+				getInt32(pak, sb, "Unit ID");
+				getInt16(pak, sb, "X Coord");
+				getInt16(pak, sb, "Y Coord");
 		break;
 		case 0x0045 : sb.append("PAK_CLIENT_Unknown69 0x0045");
 		break;
@@ -459,7 +531,8 @@ public class PakTypes {
 				"   2   int8 unknown; // usually 0");
 		break;
 		case 0x0059 : sb.append("PAK_CLIENT_TogglePages 0x0059"+System.lineSeparator()+
-				"   2   int8 status; // 0 = pages disabled, 1 = pages enabled");
+				"   2   int8 status; // 0 = pages disabled, 1 = pages enabled"+System.lineSeparator());
+				getInt8(pak, sb, "Status");
 		break;
 		case 0x005A : sb.append("PAK_CLIENT_PlayerExists 0x005A"+System.lineSeparator()+
 				"   2   string16 playername;");
@@ -482,7 +555,8 @@ public class PakTypes {
 		case 0x0062 : sb.append("PAK_CLIENT_Unknown98 0x0062");
 		break;
 		case 0x0063 : sb.append("PAK_CLIENT_AuthenticateVersion 0x0063"+System.lineSeparator()+
-				"   2   int32 version_number;");
+				"   2   int32 version_number;"+System.lineSeparator());
+				getInt32(pak, sb, "Version Number");
 		break;
 		case 0x0064 : sb.append("PAK_CLIENT_Unknown100 0x0064 // unregistered");
 		break;
@@ -747,11 +821,40 @@ public class PakTypes {
 				"   61   int16 year;"+System.lineSeparator()+
 				"   63   int32 gold;"+System.lineSeparator()+
 				"   67   int16 level;"+System.lineSeparator()+
-				"   69   int64 base_level_xp;");
+				"   69   int64 base_level_xp;"+System.lineSeparator());
+				getInt8(pak, sb, "Unknown1");
+				getInt32(pak, sb, "Player ID");
+				getInt16(pak, sb, "X Coord");
+				getInt16(pak, sb, "Y coord");
+				getInt16(pak, sb, "World");
+				getInt32(pak, sb, "Health");
+				getInt32(pak, sb, "Max Health");
+				getInt16(pak, sb, "Mana");
+				getInt16(pak, sb, "Max Mana");
+				getInt64(pak, sb, "XP");
+				getInt64(pak, sb, "Next Level XP");
+				getInt16(pak, sb, "Strength");
+				getInt16(pak, sb, "Endurance");
+				getInt16(pak, sb, "Dexterity");
+				getInt16(pak, sb, "Willpower");
+				getInt16(pak, sb, "Wisdom");
+				getInt16(pak, sb, "Intelligence");
+				getInt16(pak, sb, "Luck");
+				getInt8(pak, sb, "Seconds");
+				getInt8(pak, sb, "Minutes");
+				getInt8(pak, sb, "Hour");
+				getInt8(pak, sb, "Day");
+				getInt8(pak, sb, "Year");
+				getInt32(pak, sb, "Gold");
+				getInt16(pak, sb, "Level");
+				getInt64(pak, sb, "Base Level XP");
+				
 		break;
 		case 0x000E : sb.append("PAK_SERVER_Login 0x000E"+System.lineSeparator()+
 				"   2    int8 status; // 0 = welcome, 1 = can't login, 2 = already logged in"+System.lineSeparator()+
-				"   3    string16 message;");
+				"   3    string16 message;"+System.lineSeparator());
+				getInt8(pak, sb, "Status");
+				getString16(pak, sb, "Message");
 		break;
 		case 0x000F : sb.append("PAK_SERVER_DeletePlayer 0x000F"+System.lineSeparator()+
 				"   2    int8 status; // 0 = no error, 1 = error");
@@ -767,7 +870,17 @@ public class PakTypes {
 				"   	2+i*13+10      int8 light_percentage; // unit radiance from 0 to 100"+System.lineSeparator()+
 				"   	2+i*13+11      int8 unit_type; // 0 = monster, 1 = NPC, 2 = player"+System.lineSeparator()+
 				"   	2+i*13+12      int8 health_percentage; // unit's visual health from 0 (red) to 100 (green)"+System.lineSeparator()+
-				"	}");
+				"	}"+System.lineSeparator());
+				int unit_count = getInt16(pak, sb, "Unit Count");
+				for (int i = 0 ; i < unit_count ; i++){
+					getInt16(pak, sb, "X Coord");
+					getInt16(pak, sb, "Y Xoord");
+					getInt16(pak, sb, "Skin ID");
+					getInt32(pak, sb, "Unit ID");
+					getInt8(pak, sb, "Light Percentage");
+					getInt8(pak, sb, "Unit Type");
+					getInt8(pak, sb, "Health Percentage");
+				}
 		break;
 		case 0x0011 : sb.append("PAK_SERVER_Unknown17 0x0011");
 		break;
@@ -782,7 +895,17 @@ public class PakTypes {
 				"   	9+i*16+6       int16 object_id; // item ID as read in the WDAs"+System.lineSeparator()+
 				"   	9+i*16+8       int32 quantity; // amount of items, if this object is stacked with others"+System.lineSeparator()+
 				"   	9+i*16+12      int32 number_of_charges; // number of charges this object has (for ex, keys)"+System.lineSeparator()+
-				"   }");
+				"   }"+System.lineSeparator());
+				getInt8(pak, sb, "Popup BackPack");
+				getInt32(pak, sb, "Player ID");
+				int item_count = getInt16(pak, sb, "Item Count");
+				for(int i = 0 ; i < item_count ; i++){
+					getInt16(pak, sb, "Icon ID");
+					getInt32(pak, sb, "Unit ID");
+					getInt16(pak, sb, "Object ID");
+					getInt32(pak, sb, "Quantity");
+					getInt32(pak, sb, "Number Of Charges");
+				}
 		break;
 		case 0x0013 : sb.append("PAK_SERVER_EquippedItems 0x0013"+System.lineSeparator()+
 				"   2   int8 Ranged_Attack;"+System.lineSeparator()+
@@ -863,7 +986,99 @@ public class PakTypes {
 				"   int16 feet_object_id;"+System.lineSeparator()+
 				"   int16 feet_item_count;"+System.lineSeparator()+
 				"   int32 feet_unknown;"+System.lineSeparator()+
-				"   string16 feet_itemname;");
+				"   string16 feet_itemname;"+System.lineSeparator());
+				getInt8(pak, sb, "Ranged Attack");
+				
+				getInt32(pak, sb, "Body Item Unit ID");
+				getInt16(pak, sb, "Body Icon ID");
+				getInt16(pak, sb, "Body Object ID");
+				getInt16(pak, sb, "Body item Count");
+				getInt32(pak, sb, "Body Unknown");
+				getString16(pak, sb, "Body Item name");
+				
+				getInt32(pak, sb, "Hands Item Unit ID");
+				getInt16(pak, sb, "Hands Icon ID");
+				getInt16(pak, sb, "Hands Object ID");
+				getInt16(pak, sb, "Hands item Count");
+				getInt32(pak, sb, "Hands Unknown");
+				getString16(pak, sb, "Hands Item name");
+				
+				getInt32(pak, sb, "Head Item Unit ID");
+				getInt16(pak, sb, "Head Icon ID");
+				getInt16(pak, sb, "Head Object ID");
+				getInt16(pak, sb, "Head item Count");
+				getInt32(pak, sb, "Head Unknown");
+				getString16(pak, sb, "Head Item name");
+				
+				getInt32(pak, sb, "Legs Item Unit ID");
+				getInt16(pak, sb, "Legs Icon ID");
+				getInt16(pak, sb, "Legs Object ID");
+				getInt16(pak, sb, "Legs item Count");
+				getInt32(pak, sb, "Legs Unknown");
+				getString16(pak, sb, "Legs Item name");
+				
+				getInt32(pak, sb, "Bracers Item Unit ID");
+				getInt16(pak, sb, "Bracers Icon ID");
+				getInt16(pak, sb, "Bracers Object ID");
+				getInt16(pak, sb, "Bracers item Count");
+				getInt32(pak, sb, "Bracers Unknown");
+				getString16(pak, sb, "Bracers Item name");
+				
+				getInt32(pak, sb, "Neck Item Unit ID");
+				getInt16(pak, sb, "Neck Icon ID");
+				getInt16(pak, sb, "Neck Object ID");
+				getInt16(pak, sb, "Neck item Count");
+				getInt32(pak, sb, "Neck Unknown");
+				getString16(pak, sb, "Neck Item name");
+				
+				getInt32(pak, sb, "Right Hand Item Unit ID");
+				getInt16(pak, sb, "Right Hand Icon ID");
+				getInt16(pak, sb, "Right Hand Object ID");
+				getInt16(pak, sb, "Right Hand item Count");
+				getInt32(pak, sb, "Right Hand Unknown");
+				getString16(pak, sb, "Right Hand Item name");
+				
+				getInt32(pak, sb, "Left Hand Item Unit ID");
+				getInt16(pak, sb, "Left Hand Icon ID");
+				getInt16(pak, sb, "Left Hand Object ID");
+				getInt16(pak, sb, "Left Hand item Count");
+				getInt32(pak, sb, "Left Hand Unknown");
+				getString16(pak, sb, "Left Hand Item name");
+				
+				getInt32(pak, sb, "Right Ring Item Unit ID");
+				getInt16(pak, sb, "Right Ring Icon ID");
+				getInt16(pak, sb, "Right Ring Object ID");
+				getInt16(pak, sb, "Right Ring item Count");
+				getInt32(pak, sb, "Right Ring Unknown");
+				getString16(pak, sb, "Right Ring Item name");
+				
+				getInt32(pak, sb, "Left Ring Item Unit ID");
+				getInt16(pak, sb, "Left Ring Icon ID");
+				getInt16(pak, sb, "Left Ring Object ID");
+				getInt16(pak, sb, "Left Ring item Count");
+				getInt32(pak, sb, "Left Ring Unknown");
+				getString16(pak, sb, "Left Ring Item name");
+				
+				getInt32(pak, sb, "Belt Item Unit ID");
+				getInt16(pak, sb, "Belt Icon ID");
+				getInt16(pak, sb, "Belt Object ID");
+				getInt16(pak, sb, "Belt item Count");
+				getInt32(pak, sb, "Belt Unknown");
+				getString16(pak, sb, "Belt Item name");
+				
+				getInt32(pak, sb, "Back Item Unit ID");
+				getInt16(pak, sb, "Back Icon ID");
+				getInt16(pak, sb, "Back Object ID");
+				getInt16(pak, sb, "Back item Count");
+				getInt32(pak, sb, "Back Unknown");
+				getString16(pak, sb, "Back Item name");
+				
+				getInt32(pak, sb, "Feet Item Unit ID");
+				getInt16(pak, sb, "Feet Icon ID");
+				getInt16(pak, sb, "Feet Object ID");
+				getInt16(pak, sb, "Feet item Count");
+				getInt32(pak, sb, "Feet Unknown");
+				getString16(pak, sb, "Feet Item name");
 		break;
 		case 0x0014 : sb.append("PAK_SERVER_ServerShutdown 0x0014");
 		break;
@@ -896,7 +1111,13 @@ public class PakTypes {
 				"      string8 playername;"+System.lineSeparator()+
 				"      int16 skin_id;"+System.lineSeparator()+
 				"      int16 level;"+System.lineSeparator()+
-				"   }");
+				"   }"+System.lineSeparator());
+				int count = getInt8(pak, sb, "Character Count");
+				for (int i = 0 ; i < count ; i++){
+					getString8(pak, sb, "Player Name");
+					getInt16(pak, sb, "Skin ID");
+					getInt16(pak, sb, "Level");
+				}
 		break;
 		case 0x001B : sb.append("PAK_SERVER_IndirectTalk 0x001B"+System.lineSeparator()+
 				"   2   int32 sender_id;"+System.lineSeparator()+
@@ -932,7 +1153,9 @@ public class PakTypes {
 		break;
 		case 0x0021 : sb.append("PAK_SERVER_UpdateLife 0x0021"+System.lineSeparator()+
 				"   2   int32 health;"+System.lineSeparator()+
-				"   6   int32 max_health;");
+				"   6   int32 max_health;"+System.lineSeparator());
+				getInt32(pak, sb, "Health");
+				getInt32(pak, sb, "Max Health");
 		break;
 		case 0x0022 : sb.append("PAK_SERVER_BroadcastTextChange 0x0022"+System.lineSeparator()+
 				"   2   int32 npc_unit_id;"+System.lineSeparator()+
@@ -952,7 +1175,13 @@ public class PakTypes {
 				"   12   int32 health;"+System.lineSeparator()+
 				"   16   int32 max_health;"+System.lineSeparator()+
 				"   20   int16 mana;"+System.lineSeparator()+
-				"   22   int16 max_mana;");
+				"   22   int16 max_mana;"+System.lineSeparator());
+				getInt16(pak, sb, "Level");
+				getInt64(pak, sb, "XP Before Next Level");
+				getInt32(pak, sb, "Health");
+				getInt32(pak, sb, "Max Health");
+				getInt16(pak, sb, "Mana");
+				getInt16(pak, sb, "Max Mana");
 		break;
 		case 0x0026 : sb.append("PAK_SERVER_ReturnToMenu 0x0026"+System.lineSeparator()+
 				"   2   int8 status; // 0 = OK, 1 = error");
@@ -1081,7 +1310,8 @@ public class PakTypes {
 		case 0x0034 : sb.append("PAK_SERVER_Unknown52 0x0034");
 		break;
 		case 0x0035 : sb.append("PAK_SERVER_UpdateGold 0x0035"+System.lineSeparator()+
-				"   2   int32 gold;");
+				"   2   int32 gold;"+System.lineSeparator());
+				getInt32(pak, sb, "Gold");
 		break;
 		case 0x0036 : sb.append("PAK_SERVER_Unknown54 0x0036");
 		break;
@@ -1172,20 +1402,12 @@ public class PakTypes {
 				"   }");
 		break;
 		case 0x0042 : sb.append("PAK_SERVER_MessageOfTheDay 0x0042"+System.lineSeparator()+
-				"   2   string16 MOTD size : ");
-		pak.rewind();
-		pak.getShort();
-		short size = pak.getShort();
-		sb.append(size);
-		sb.append(System.lineSeparator());
-		sb.append("MOTD : ");
-		byte[] motd = new byte[size];
-		pak.get(motd,0,size);
-		sb.append(new String(motd));
-		sb.append(System.lineSeparator());
+				"   2   string16 MOTD"+System.lineSeparator());
+				getString16(pak, sb, "MOTD");
 		break;
 		case 0x0043 : sb.append("PAK_SERVER_UpdateMana 0x0043"+System.lineSeparator()+
-				"   2   int16 mana;");
+				"   2   int16 mana;"+System.lineSeparator());
+				getInt16(pak, sb, "Mana");
 		break;
 		case 0x0044 : sb.append("PAK_SERVER_PuppetInformation 0x0044"+System.lineSeparator()+
 				"   2   int32 unit_id;"+System.lineSeparator()+
@@ -1196,7 +1418,18 @@ public class PakTypes {
 				"   14   int16 legs_type_id;"+System.lineSeparator()+
 				"   16   int16 weapon_type_id;"+System.lineSeparator()+
 				"   18   int16 shield_type_id;"+System.lineSeparator()+
-				"   20   int16 back_type_id;");
+				"   20   int16 back_type_id;"+System.lineSeparator());
+				getInt32(pak, sb, "Unit ID");
+				getInt16(pak, sb, "Body Type ID");
+				getInt16(pak, sb, "Feet Type ID");
+				getInt16(pak, sb, "Hands Type ID");
+				getInt16(pak, sb, "Head Type ID");
+				getInt16(pak, sb, "Legs Type ID");
+				getInt16(pak, sb, "Weapon Type ID");
+				getInt16(pak, sb, "Shield Type ID");
+				getInt16(pak, sb, "Back Type ID");
+				
+				
 		break;
 		case 0x0045 : sb.append("PAK_SERVER_UnitAppearance 0x0045"+System.lineSeparator()+
 				"   2   int16 skin_id;"+System.lineSeparator()+
@@ -1224,7 +1457,12 @@ public class PakTypes {
 				"   {"+System.lineSeparator()+
 				"      string16 channelname;"+System.lineSeparator()+
 				"      int8 status; // 0 = closed, 1 = open"+System.lineSeparator()+
-				"   }");
+				"   }"+System.lineSeparator());
+				int channel_count = getInt16(pak, sb, "Channel count");
+				for(int i = 0 ; i< channel_count ; i++){
+					getString16(pak, sb, "Channel Name");
+					getInt8(pak, sb, "Status");
+				}
 		break;
 		case 0x004C : sb.append("PAK_SERVER_CreateGroup 0x004C"+System.lineSeparator()+
 				"   int8 unknown; // unused (probably obsolete), always 0x01"+System.lineSeparator()+
@@ -1284,7 +1522,13 @@ public class PakTypes {
 				"   string16 filename;"+System.lineSeparator()+
 				"   string16 login;"+System.lineSeparator()+
 				"   string16 password;"+System.lineSeparator()+
-				"   int16 unknown1;");
+				"   int16 unknown1;"+System.lineSeparator());
+				getInt32(pak, sb, "Server Version");
+				getString16(pak, sb, "URL");
+				getString16(pak, sb, "Filename");
+				getString16(pak, sb, "Login");
+				getString16(pak, sb, "Password");
+				getInt16(pak, sb, "Unknown1");
 		break;
 		case 0x005C : sb.append("PAK_SERVER_CarriableWeight 0x005C // actualize current luggage and max carriable weight"+System.lineSeparator()+
 				"   2   int32 current_weight;"+System.lineSeparator()+
@@ -1331,7 +1575,9 @@ public class PakTypes {
 		break;
 		case 0x0061 : sb.append("PAK_SERVER_ServerFlags 0x0061"+System.lineSeparator()+
 				"   2   int8 scripts_enabled; // 1 = scripts enabled, 2 = ???"+System.lineSeparator()+
-				"   3   int8 help_enabled; // 0 = disabled, 1 = enabled");
+				"   3   int8 help_enabled; // 0 = disabled, 1 = enabled"+System.lineSeparator());
+				getInt8(pak, sb, "Scripts Enabled");
+				getInt8(pak, sb, "Help Enabled");
 		break;
 		case 0x0062 : sb.append("PAK_SERVER_SeraphArrival 0x0062"+System.lineSeparator()+
 				"   2   int16 pak1_id; // 10004 (PAK_SERVER_PopupUnit)"+System.lineSeparator()+
@@ -1354,7 +1600,8 @@ public class PakTypes {
 				"   37   int16 back_type_id;");
 		break;
 		case 0x0063 : sb.append("PAK_SERVER_AuthenticateVersion 0x0063"+System.lineSeparator()+
-				"   2   int32 status; // (assumed) 0 = client version unusable, 1 = client version usable");
+				"   2   int32 status; // (assumed) 0 = client version unusable, 1 = client version usable"+System.lineSeparator());
+				getInt32(pak, sb, "Status");
 		break;
 		case 0x0064 : sb.append("PAK_SERVER_ResetRegistryInventory 0x0064");
 		break;
@@ -1369,7 +1616,8 @@ public class PakTypes {
 				"   10  string16 message;");
 		break;
 		case 0x0067 : sb.append("PAK_SERVER_MaxCharactersPerAccount 0x0067"+System.lineSeparator()+
-				"   2   int8 max_characters; // max amount of characters allowed per account (usually 3)");
+				"   2   int8 max_characters; // max amount of characters allowed per account (usually 3)"+System.lineSeparator());
+				getInt8(pak, sb, "Max Characters Per Account");
 		break;
 		case 0x0068 : sb.append("PAK_SERVER_ToggleWeather 0x0068"+System.lineSeparator()+
 				"   2   int16 enabled; // set to 0x0001 to enable rain, 0x0000 to disable");
@@ -1522,4 +1770,6 @@ public class PakTypes {
 		
 		return sb.toString();
 	}
+	
+	
 }

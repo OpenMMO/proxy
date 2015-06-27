@@ -4,5 +4,30 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
 	<classpathentry kind="lib" path="lib/log4j-api-2.0-rc1.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-core-2.0-rc1.jar"/>
+	<classpathentry kind="lib" path="lib/gdx/gdx-backend-lwjgl-natives.jar" sourcepath="lib/gdx/sources/gdx-backend-lwjgl-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/gdx/docs/api/javadoc.zip!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/gdx/gdx-backend-lwjgl.jar" sourcepath="lib/gdx/sources/gdx-backend-lwjgl-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/gdx/docs/api/javadoc.zip!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/gdx/gdx-natives.jar" sourcepath="lib/gdx/sources/gdx-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/gdx/docs/api/javadoc.zip!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/gdx/gdx.jar" sourcepath="lib/gdx/sources/gdx-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/gdx/docs/api/javadoc.zip!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/gdx/extensions/gdx-tools/gdx-tools.jar" sourcepath="lib/gdx/extensions/gdx-tools/sources/gdx-tools-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/Opent4cProxy/lib/gdx/docs/api/javadoc.zip!/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
