@@ -1,35 +1,41 @@
 package com.fortytwo.opent4c.proxy;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.Logger;
 import org.apache.logging.log4j.core.config.XMLConfigurationFactory;
 
-import com.fortytwo.opent4c.bot.Bot150;
-import com.fortytwo.opent4c.tools.CalendarUtils;
-import com.fortytwo.opent4c.tools.HexString;
+import com.badlogic.gdx.Game;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.backends.lwjgl.LwjglApplication;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.fortytwo.opent4c.screens.BotScreen;
+import com.fortytwo.opent4c.screens.ClientScreen;
+import com.fortytwo.opent4c.screens.InfoScreen;
+import com.fortytwo.opent4c.screens.MonitorScreen;
+import com.fortytwo.opent4c.screens.ServerScreen;
+import com.fortytwo.opent4c.screens.StatScreen;
 import com.fortytwo.opent4c.tools.Log;
-import com.fortytwo.opent4c.tools.PakTypes;
 
-/**
- * Proxy for translating T4C paks form version to version between client and server, and to translate T4C paks to and from openT4C paks.
- * @author syno
- *
- */
-public class Proxy {
+public class ProxyManager extends Game{
+
+	private static ShaderProgram shader;
+	private static ProxyManager app;
+	private SpriteBatch batch;
+	private static InfoScreen infoScreen;
+	private static StatScreen statScreen;
+	private static MonitorScreen monitorScreen;
+	private static ServerScreen serverScreen;
+	private static ClientScreen clientScreen;
+	private static BotScreen botScreen;
 	public static long startTime;
 	private static final String cfgFile = "res/proxy.cfg";
 	public static int max_clients;
@@ -40,11 +46,15 @@ public class Proxy {
 	public static int netspeed;
 	public static InetAddress serverAddress;
 	public static boolean sniffer;
-	private static boolean bot;
+	public static boolean bot;
 	private static ExecutorService exService = Executors.newFixedThreadPool(4);
-	private static Runnable botRunnable;
 	private static ClientManager clientManager;
-	
+
+	/**
+	 * Initialise l'affichage
+	 * @param args
+	 * @throws IOException 
+	 */
 	public static void main(String[] args) throws IOException {
 		System.setProperty(XMLConfigurationFactory.CONFIGURATION_FILE_PROPERTY, "res/log4j2.xml");
 		if(args.length != 0){
@@ -55,27 +65,39 @@ public class Proxy {
 			startTime = System.nanoTime();
 		}
 		readCfgFile(cfgFile);
+		GDXConfig.loadCFG();
+		app = new ProxyManager();
+		new LwjglApplication(app, GDXConfig.cfg);
+		Gdx.app.postRunnable(new Runnable(){
+			public void run(){
+				createShaders();
+			}
+		});
 		clientManager = new ClientManager();
-		if(bot) createBot();
-
+	}
+	
+	@Override
+	public void create() {
+		Gdx.app.log("Init", "ok");
+		batch = new SpriteBatch(2048, getShader());
+		infoScreen = new InfoScreen(batch); 
+		statScreen = new StatScreen(batch); 
+		monitorScreen = new MonitorScreen(batch); 
+		serverScreen = new ServerScreen(batch); 
+		clientScreen = new ClientScreen(batch); 
+		botScreen = new BotScreen(batch); 
+		setScreen(infoScreen);
 	}
 
 	/**
-	 * creates a bot depending on server version
+	 * crée le shader program pour utilisation d'opengl3
 	 */
-	private static void createBot() {
-		switch(serverVersion){
-		case 150 :
-			botRunnable = new Runnable(){
-				public void run(){
-					Bot150 bot = new Bot150();
-				}
-			};
-			exService.submit(botRunnable);
-		break;
-		}
+	private static void createShaders() {
+		shader = new ShaderProgram(Shaders.vertexShader, Shaders.fragmentShader);
+		Gdx.app.log("Shader","compiled");
+		if(!shader.isCompiled())Gdx.app.log("Shader",shader.getLog());
 	}
-
+	
 	/**
 	 * Reads proxy parameters from proxy.cfg file
 	 * @param cfg 
@@ -118,11 +140,92 @@ public class Proxy {
 		else if(params[0].equalsIgnoreCase("proxy port"))proxyPort = Integer.parseInt(params[1]);
 		else if(params[0].equalsIgnoreCase("bot"))bot = Boolean.parseBoolean(params[1]);
 		else if(params[0].equalsIgnoreCase("sniffer"))sniffer = Boolean.parseBoolean(params[1]);
-		else if(params[0].equalsIgnoreCase("netspeed"))netspeed = Integer.parseInt(params[1]);
 		else{
 			Log.proxy.error("Unknown parameter "+ line);
 			return;
 		}
 		Log.proxy.info(params[0]+" = "+params[1]);
+	}
+	
+	/**
+	 * permet à l'application d'obtenir le shader program
+	 * @return
+	 */
+	public static ShaderProgram getShader(){
+		return shader;
+	}
+
+	public static String getTitle() {
+		return GDXConfig.cfg.title;
+	}
+
+	public static void quit() {
+		Gdx.app.exit();
+	}
+
+	public static void setPakStatsScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(statScreen);
+		//	}
+			
+		//});
+	}
+
+	public static void setMonitorScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(monitorScreen);
+		//	}
+			
+		//});		
+	}
+
+	public static void setServerScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(serverScreen);
+		//	}
+			
+		//});		
+	}
+
+	public static void setClientsScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(clientScreen);
+		//	}
+			
+		//});		
+	}
+
+	public static void setBotsScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(botScreen);
+		//	}
+			
+		//});		
+	}
+	
+	public static void setInfoScreen() {
+		//Gdx.app.postRunnable(new Runnable(){
+
+		//	@Override
+		//	public void run() {
+				app.setScreen(infoScreen);
+		//	}
+			
+		//});		
 	}
 }

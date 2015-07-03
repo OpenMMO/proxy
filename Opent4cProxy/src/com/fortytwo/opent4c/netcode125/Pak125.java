@@ -1,4 +1,4 @@
-package com.fortytwo.opent4c.proxy;
+package com.fortytwo.opent4c.netcode125;
 
 import java.net.DatagramPacket;
 import java.nio.ByteBuffer;

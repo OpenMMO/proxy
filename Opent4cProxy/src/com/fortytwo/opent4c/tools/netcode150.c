@@ -117,7 +117,7 @@ void Pak_SwitchEncryptionOn_150 (pak_t *pak)
     //printf("Choose a random seed");
 
     //seed = lrand(); // generate a random seed for this pak's encryption
-	seed = 1463307735;
+	seed = 0x0E0040F7;
 
     // initialize the system's pseudo-random number generator from the seed used in the datagram
     // (they apparently swapped the bytes in an attempt to confuse the reverse-engineerers)
@@ -252,13 +252,13 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
 {
     // the 1.50 protocol cryptography uses extensively the standard C random number generator,
     // which is a VERY BAD idea, since its implementation may differ from system to system !!!
-
+	  int i = 0;
     char stack1[10];
     char stack2[10];
     unsigned char a;
     unsigned char c;
-    unsigned char *edi;
-    unsigned char *ebp;
+    char *edi;
+    char *ebp;
     int index;
     unsigned int algo;
     signed short checksum;
@@ -267,15 +267,15 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
           | (int) (((unsigned char *) &pak->seed)[3] << 16)
           | (int) (((unsigned char *) &pak->seed)[1] << 8)
           | (int) (((unsigned char *) &pak->seed)[2]);
-    printf("|Init PRNG with seed : %X\n", unmixed_seed);
+    printf("|Init PRNG with seed : %X from seed : %X\n", unmixed_seed, pak->seed);
     randm *rnd = createRandom(unmixed_seed);
 
    // stack sequences
    //printf("generate 2 size 10 int arrays :");
    for (index = 0; index < 10; index++)
    {
-      stack1[index] = (unsigned char) rndNext(rnd);
-      stack2[index] = (unsigned char) rndNext(rnd);
+      stack1[index] = (char) rndNext(rnd);
+      stack2[index] = (char) rndNext(rnd);
       //printf("  [%X %X]",stack1[index],stack2[index]);
    }
    //printf("\n");
@@ -298,7 +298,7 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
       cryptotables_150->offsets[index] = rndNext(rnd) % pak->data_size;
       if (cryptotables_150->offsets[index] == (unsigned int) index) cryptotables_150->offsets[index] = (index == 0 ? 1 : 0);
       cryptotables_150->algo[index] = rndNext(rnd) % 21;
-      //printf(" [%X %d]", cryptotables_150->offsets[index], cryptotables_150->algo[index]);
+      //printf(" [%X %X]", cryptotables_150->offsets[index], cryptotables_150->algo[index]);
    }
    //printf("\n");
 
@@ -312,7 +312,7 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
 
       a = *ebp;
       c = *edi;
-
+		//printf("%d PAKINDEX %X PAKOFFSET %X\n",index,*edi, *ebp);
       if      (algo == 0)  { *edi = ((a ^ c) & 0x0F) ^ c;  *ebp = ((a ^ c) & 0x0F) ^ a;  }
       else if (algo == 1)  { *edi = ((a ^ c) & 0x0F) ^ c;  *ebp = (a >> 4) | (c << 4);   }
       else if (algo == 2)  { *edi = (c >> 4) | (c << 4);   *ebp = (a >> 4) | (a << 4);   }
@@ -335,8 +335,10 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
       else if (algo == 19) { *edi = (a >> 4) | (a << 4);   *ebp = c;                     }
       else if (algo == 20) { *edi = ((a ^ c) & 0x0F) ^ a;  *ebp = (a << 4) | (c >> 4);   }
       //printf("  %d %X %X\n",index,*edi, *ebp);
+	for(i = 0 ; i < pak->data_size ; i++)printf("%X",pak->data[i]);
+	printf("\n");
    }
-   //printf("OK\n");
+
 
    // and finally, quadruple-XOR the data out
    //printf("quadruple-XOR the data out\n");
@@ -362,6 +364,8 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
       }
       else if (index == pak->data_size - 1)
          pak->data[index] ^= (cryptotables_150->xors[index] & 0xFF); // end of stream
+         	for(i = 0 ; i < pak->data_size ; i++)printf("%X",pak->data[i]);
+	printf("\n");
    //printf(" %d %X\n",index,pak->data[index]);
    }
    //printf("OK\n");
@@ -382,24 +386,26 @@ signed short Pak_SwitchEncryptionOff_150 (pak_t *pak)
 }
 
 int test(void){
-    unsigned char *msg;
+    char *msg;
     int index;
-    unsigned short chk;
-    printf("------------------------------------------------------\n|Netcode 150 ENCRYPT TEST\n");
-    msg = malloc (2 * sizeof(char));
-    msg[0] = 0x00;
-    msg[1] = 0x42;
+    signed short chk;
+    //printf("------------------------------------------------------\n|Netcode 150 ENCRYPT TEST\n");
+    msg = malloc (4 * sizeof(char));
+    msg[0] = 0x72;
+    msg[1] = 0xDD;
+    msg[2] = 0x28;
+    msg[3] = 0xA4;
     printf("|Message input : ");
-    for (index = 0; index < 2; index++) printf("%X",msg[index]);
+    for (index = 0; index < 4; index++) printf("%X",msg[index]);
     printf("\n");
-    pak_t *pack = createPak(2,msg);
-
-    Pak_SwitchEncryptionOn_150(pack);
-    printf("|Message output : ");
-    for (index = 0; index < pack->data_size; index++)printf("%X",pack->data[index]);
-    printf("\n------------------------------------------------------\n");
+    pak_t *pack = createPak(4,msg);
+	pack->seed = 0x00D40B1F;
+    //Pak_SwitchEncryptionOn_150(pack);
+    //printf("|Message output : ");
+    //for (index = 0; index < pack->data_size; index++)printf("%X",pack->data[index]);
+    //printf("\n------------------------------------------------------\n");
     printf("|Netcode 150 DECRYPT TEST\n|Message input : ");
-    for (index = 0; index < pack->data_size; index++) printf("%X",pack->data[index]);
+    for (index = 0; index < pack->data_size; index++) printf("%X ",pack->data[index]);
     printf("\n");
     chk = Pak_SwitchEncryptionOff_150(pack);
     printf("|Decrypted message : ");
@@ -461,12 +467,14 @@ int decrypt(int size , unsigned char* msg){
     int index;
     unsigned short chk;
     printf("------------------------------------------------------\n|Netcode 150 DECRYPT\n|Message input : ");
-    for (index = 0; index < size; index++) printf("%X",msg[index]);
+    for (index = 0; index < size; index++) printf("%X ",msg[index]);
     printf("\n");
-
+	size -= 4;
+	int seed = (int) msg[0] << 24 | (int) msg[1] << 16 | (int) msg[2] << 8 | (int) msg[3];
+	msg += 4;
     pak_t *pack = createPak(size,msg);
-    pack->seed = (int) msg[0] << 16 | (int) msg[1] << 8;
-	msg += 2 * sizeof(char);
+    pack->seed = seed;
+	//pack->data += 4 * sizeof(char);
     chk = Pak_SwitchEncryptionOff_150(pack);
     printf("|Message output : ");
     for (index = 0; index < pack->data_size; index++)printf("%X ",pack->data[index]);

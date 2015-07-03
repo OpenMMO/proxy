@@ -6,21 +6,15 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.fortytwo.opent4c.proxy.ClientManager;
-import com.fortytwo.opent4c.proxy.ClientTunnel;
-import com.fortytwo.opent4c.proxy.Pak150;
-import com.fortytwo.opent4c.proxy.Proxy;
-import com.fortytwo.opent4c.proxy.ServerTunnel;
-import com.fortytwo.opent4c.tools.HexString;
+import com.fortytwo.opent4c.netcode150.Pak150;
+import com.fortytwo.opent4c.proxy.ProxyManager;
 import com.fortytwo.opent4c.tools.Log;
-import com.fortytwo.opent4c.tools.PakTypes;
 
 public class Bot150 {
 	private static Runnable serverTunnel;
@@ -51,8 +45,8 @@ public class Bot150 {
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
-		Pak150 handshake = new Pak150(PakTypes.PAK_CLIENT_MessageOfTheDay, Pak150.CLIENT_TO_SERVER, new byte[]{}, (byte) 0, true, false, false, 0, 0);
-		sendPacket = new DatagramPacket(handshake.getSendData().array(), handshake.getSendData().array().length, Proxy.serverAddress, Proxy.serverPort);
+		//Pak150 handshake = new Pak150(PakTypes.PAK_CLIENT_MessageOfTheDay, Pak150.CLIENT_TO_SERVER, new byte[]{}, (byte) 0, true, false, false, 0, 0);
+		//sendPacket = new DatagramPacket(handshake.getSendData().array(), handshake.getSendData().array().length, ProxyManager.serverAddress, ProxyManager.serverPort);
 		pile(sendPacket);
 	}
 
@@ -74,7 +68,7 @@ public class Bot150 {
 				send(sendpile.get(0));
 				sendpile.remove(0);
 			}
-			Thread.sleep(Proxy.netspeed);
+			Thread.sleep(ProxyManager.netspeed);
 		}
 	}
 	
@@ -100,11 +94,11 @@ public class Bot150 {
 			for (int i =0 ; i< length ; i++){
 				data[i] = receiveData[i];
 			}
-			micros = ((System.nanoTime()-Proxy.startTime)%1000000)/1000;
+			micros = ((System.nanoTime()-ProxyManager.startTime)%1000000)/1000;
 			stamp = System.currentTimeMillis();
 				Log.bot.info("Received Message from server for client "+":"+port);
-				if (Proxy.serverVersion == 150){
-					received = new Pak150(data, Pak150.SERVER_TO_CLIENT, stamp, micros);
+				if (ProxyManager.serverVersion == 150){
+					//received = new Pak150(data, Pak150.SERVER_TO_CLIENT, stamp, micros);
 				}
 		}
 	}
